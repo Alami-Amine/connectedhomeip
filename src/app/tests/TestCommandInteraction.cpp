@@ -23,6 +23,7 @@
  */
 
 #include <cinttypes>
+#include <optional>
 
 #include <pw_unit_test/framework.h>
 
@@ -30,8 +31,6 @@
 #include <app/InteractionModelEngine.h>
 #include <app/data-model/Encode.h>
 #include <app/tests/AppTestContext.h>
-#include <app/tests/CommandHandlerTestAccess.h>
-#include <app/tests/CommandSenderTestAccess.h>
 #include <lib/core/CHIPCore.h>
 #include <lib/core/ErrorStr.h>
 #include <lib/core/Optional.h>
@@ -39,11 +38,10 @@
 #include <lib/core/TLVDebug.h>
 #include <lib/core/TLVUtilities.h>
 #include <lib/support/logging/CHIPLogging.h>
+#include <lib/support/tests/ExtraPwTestMacros.h>
 #include <messaging/ExchangeContext.h>
 #include <messaging/ExchangeMgr.h>
 #include <messaging/Flags.h>
-#include <messaging/tests/ReliableMessageContextTestAccess.h>
-#include <optional>
 #include <platform/CHIPDeviceLayer.h>
 #include <protocols/interaction_model/Constants.h>
 #include <system/SystemPacketBuffer.h>
@@ -78,8 +76,7 @@
         EXPECT_EQ(localRm->TestGetCountRetransTable(), 1);                                                                         \
                                                                                                                                    \
         localRm->EnumerateRetransTable([localExchange](auto * entry) {                                                             \
-            chip::Test::ReliableMessageContextTestAccess(localExchange)                                                            \
-                .SetPendingPeerAckMessageCounter(entry->retainedBuf.GetMessageCounter());                                          \
+            localExchange->SetPendingPeerAckMessageCounter(entry->retainedBuf.GetMessageCounter());                                \
             return Loop::Break;                                                                                                    \
         });                                                                                                                        \
     }
@@ -417,6 +414,25 @@ public:
         return chip::app::InteractionModelEngine::GetInstance()->mCommandResponderObjs.Allocated();
     }
 
+    void TestCommandInvalidMessage1();
+    void TestCommandInvalidMessage2();
+    void TestCommandInvalidMessage3();
+    void TestCommandInvalidMessage4();
+    void TestCommandSender_WithSendCommand();
+    void TestCommandSender_WithProcessReceivedMsg();
+    void TestCommandSender_ExtendableApiWithProcessReceivedMsg();
+    void TestCommandSender_ExtendableApiWithProcessReceivedMsgContainingInvalidCommandRef();
+    void TestCommandHandler_WithoutResponderCallingAddStatus();
+    void TestCommandHandler_WithoutResponderCallingAddResponse();
+    void TestCommandHandler_WithoutResponderCallingDirectPrepareFinishCommandApis();
+    void TestCommandHandler_RejectsMultipleCommandsWithIdenticalCommandRef();
+    void TestCommandHandler_RejectMultipleCommandsWhenHandlerOnlySupportsOne();
+    void TestCommandHandler_AcceptMultipleCommands();
+    void TestCommandHandler_FillUpInvokeResponseMessageWhereSecondResponseIsStatusResponse();
+    void TestCommandHandler_FillUpInvokeResponseMessageWhereSecondResponseIsDataResponsePrimative();
+    void TestCommandHandler_FillUpInvokeResponseMessageWhereSecondResponseIsDataResponse();
+    void TestCommandHandler_ReleaseWithExchangeClosed();
+
     /**
      * With the introduction of batch invoke commands, CommandHandler keeps track of incoming
      * ConcreteCommandPath and the associated CommandRefs. These are normally populated
@@ -428,8 +444,7 @@ public:
     {
     public:
         CommandHandlerWithUnrespondedCommand(CommandHandler::Callback * apCallback, const ConcreteCommandPath & aRequestCommandPath,
-                                             const Optional<uint16_t> & aRef) :
-            CommandHandler(apCallback)
+                                             const Optional<uint16_t> & aRef) : CommandHandler(apCallback)
         {
             GetCommandPathRegistry().Add(aRequestCommandPath, aRef.std_optional());
             SetExchangeInterface(&mMockCommandResponder);
@@ -662,9 +677,9 @@ uint32_t TestCommandInteraction::GetAddResponseDataOverheadSizeForPath(const Con
     MockCommandResponder mockCommandResponder;
     CommandHandler::TestOnlyOverrides testOnlyOverrides{ &basicCommandPathRegistry, &mockCommandResponder };
     CommandHandler commandHandler(testOnlyOverrides, &mockCommandHandlerDelegate);
-    chip::Test::CommandHandlerTestAccess(&commandHandler).SetReserveSpaceForMoreChunkMessages(true);
-    ConcreteCommandPath requestCommandPath1 = { kTestEndpointId, kTestClusterId, kTestCommandIdFillResponseMessage };
-    ConcreteCommandPath requestCommandPath2 = { kTestEndpointId, kTestClusterId, kTestCommandIdCommandSpecificResponse };
+    commandHandler.mReserveSpaceForMoreChunkMessages = true;
+    ConcreteCommandPath requestCommandPath1          = { kTestEndpointId, kTestClusterId, kTestCommandIdFillResponseMessage };
+    ConcreteCommandPath requestCommandPath2          = { kTestEndpointId, kTestClusterId, kTestCommandIdCommandSpecificResponse };
 
     CHIP_ERROR err = basicCommandPathRegistry.Add(requestCommandPath1, std::make_optional<uint16_t>(static_cast<uint16_t>(1)));
     EXPECT_EQ(err, CHIP_NO_ERROR);
@@ -674,17 +689,15 @@ uint32_t TestCommandInteraction::GetAddResponseDataOverheadSizeForPath(const Con
     err = commandHandler.AllocateBuffer();
     EXPECT_EQ(err, CHIP_NO_ERROR);
 
-    uint32_t remainingSizeBefore =
-        chip::Test::CommandHandlerTestAccess(&commandHandler).GetInvokeResponseBuilder().GetWriter()->GetRemainingFreeLength();
+    uint32_t remainingSizeBefore = commandHandler.mInvokeResponseBuilder.GetWriter()->GetRemainingFreeLength();
 
     // When ForcedSizeBuffer exceeds 255, an extra byte is needed for length, affecting the overhead size required by
     // AddResponseData. In order to have this accounted for in overhead calculation we set the length to be 256.
     uint32_t sizeOfForcedSizeBuffer = aBufferSizeHint == ForcedSizeBufferLengthHint::kSizeGreaterThan255 ? 256 : 0;
     err                             = commandHandler.AddResponseData(aRequestCommandPath, ForcedSizeBuffer(sizeOfForcedSizeBuffer));
     EXPECT_EQ(err, CHIP_NO_ERROR);
-    uint32_t remainingSizeAfter =
-        chip::Test::CommandHandlerTestAccess(&commandHandler).GetInvokeResponseBuilder().GetWriter()->GetRemainingFreeLength();
-    uint32_t delta = remainingSizeBefore - remainingSizeAfter - sizeOfForcedSizeBuffer;
+    uint32_t remainingSizeAfter = commandHandler.mInvokeResponseBuilder.GetWriter()->GetRemainingFreeLength();
+    uint32_t delta              = remainingSizeBefore - remainingSizeAfter - sizeOfForcedSizeBuffer;
 
     return delta;
 }
@@ -732,7 +745,7 @@ void TestCommandInteraction::ValidateCommandHandlerEncodeInvokeResponseMessage(b
 
 // Command Sender sends invoke request, command handler drops invoke response, then test injects status response message with
 // busy to client, client sends out a status response with invalid action.
-TEST_F(TestCommandInteraction, TestCommandInvalidMessage1)
+TEST_F_FROM_FIXTURE(TestCommandInteraction, TestCommandInvalidMessage1)
 {
     CHIP_ERROR err = CHIP_NO_ERROR;
     mockCommandSenderDelegate.ResetCounter();
@@ -772,20 +785,18 @@ TEST_F(TestCommandInteraction, TestCommandInvalidMessage1)
     chip::Test::MessageCapturer messageLog(*mpTestContext);
     messageLog.mCaptureStandaloneAcks = false;
 
-    chip::Test::CommandSenderTestAccess privatecommandSender(&commandSender);
-
     // Since we are dropping packets, things are not getting acked.  Set up our
     // MRP state to look like what it would have looked like if the packet had
     // not gotten dropped.
 
-    PretendWeGotReplyFromServer(*mpTestContext, privatecommandSender.GetExchangeCtx().Get());
+    PretendWeGotReplyFromServer(*mpTestContext, commandSender.mExchangeCtx.Get());
 
     mpTestContext->GetLoopback().mSentMessageCount                 = 0;
     mpTestContext->GetLoopback().mNumMessagesToDrop                = 0;
     mpTestContext->GetLoopback().mNumMessagesToAllowBeforeDropping = 0;
     mpTestContext->GetLoopback().mDroppedMessageCount              = 0;
 
-    err = privatecommandSender.OnMessageReceived(privatecommandSender.GetExchangeCtx().Get(), payloadHeader, std::move(msgBuf));
+    err = commandSender.OnMessageReceived(commandSender.mExchangeCtx.Get(), payloadHeader, std::move(msgBuf));
     EXPECT_EQ(err, CHIP_IM_GLOBAL_STATUS(Busy));
     EXPECT_EQ(mockCommandSenderDelegate.mError, CHIP_IM_GLOBAL_STATUS(Busy));
     EXPECT_EQ(mockCommandSenderDelegate.onResponseCalledTimes, 0);
@@ -807,7 +818,7 @@ TEST_F(TestCommandInteraction, TestCommandInvalidMessage1)
 
 // Command Sender sends invoke request, command handler drops invoke response, then test injects unknown message to client,
 // client sends out status response with invalid action.
-TEST_F(TestCommandInteraction, TestCommandInvalidMessage2)
+TEST_F_FROM_FIXTURE(TestCommandInteraction, TestCommandInvalidMessage2)
 {
     CHIP_ERROR err = CHIP_NO_ERROR;
     mockCommandSenderDelegate.ResetCounter();
@@ -849,16 +860,15 @@ TEST_F(TestCommandInteraction, TestCommandInvalidMessage2)
     // Since we are dropping packets, things are not getting acked.  Set up our
     // MRP state to look like what it would have looked like if the packet had
     // not gotten dropped.
-    chip::Test::CommandSenderTestAccess privatecommandSender(&commandSender);
 
-    PretendWeGotReplyFromServer(*mpTestContext, privatecommandSender.GetExchangeCtx().Get());
+    PretendWeGotReplyFromServer(*mpTestContext, commandSender.mExchangeCtx.Get());
 
     mpTestContext->GetLoopback().mSentMessageCount                 = 0;
     mpTestContext->GetLoopback().mNumMessagesToDrop                = 0;
     mpTestContext->GetLoopback().mNumMessagesToAllowBeforeDropping = 0;
     mpTestContext->GetLoopback().mDroppedMessageCount              = 0;
 
-    err = privatecommandSender.OnMessageReceived(privatecommandSender.GetExchangeCtx().Get(), payloadHeader, std::move(msgBuf));
+    err = commandSender.OnMessageReceived(commandSender.mExchangeCtx.Get(), payloadHeader, std::move(msgBuf));
     EXPECT_EQ(err, CHIP_ERROR_INVALID_MESSAGE_TYPE);
     EXPECT_EQ(mockCommandSenderDelegate.mError, CHIP_ERROR_INVALID_MESSAGE_TYPE);
     EXPECT_EQ(mockCommandSenderDelegate.onResponseCalledTimes, 0);
@@ -879,7 +889,7 @@ TEST_F(TestCommandInteraction, TestCommandInvalidMessage2)
 
 // Command Sender sends invoke request, command handler drops invoke response, then test injects malformed invoke response
 // message to client, client sends out status response with invalid action.
-TEST_F(TestCommandInteraction, TestCommandInvalidMessage3)
+TEST_F_FROM_FIXTURE(TestCommandInteraction, TestCommandInvalidMessage3)
 {
     CHIP_ERROR err = CHIP_NO_ERROR;
     mockCommandSenderDelegate.ResetCounter();
@@ -921,15 +931,14 @@ TEST_F(TestCommandInteraction, TestCommandInvalidMessage3)
     // Since we are dropping packets, things are not getting acked.  Set up our
     // MRP state to look like what it would have looked like if the packet had
     // not gotten dropped.
-    chip::Test::CommandSenderTestAccess privatecommandSender(&commandSender);
-    PretendWeGotReplyFromServer(*mpTestContext, privatecommandSender.GetExchangeCtx().Get());
+    PretendWeGotReplyFromServer(*mpTestContext, commandSender.mExchangeCtx.Get());
 
     mpTestContext->GetLoopback().mSentMessageCount                 = 0;
     mpTestContext->GetLoopback().mNumMessagesToDrop                = 0;
     mpTestContext->GetLoopback().mNumMessagesToAllowBeforeDropping = 0;
     mpTestContext->GetLoopback().mDroppedMessageCount              = 0;
 
-    err = privatecommandSender.OnMessageReceived(privatecommandSender.GetExchangeCtx().Get(), payloadHeader, std::move(msgBuf));
+    err = commandSender.OnMessageReceived(commandSender.mExchangeCtx.Get(), payloadHeader, std::move(msgBuf));
 
     EXPECT_EQ(err, CHIP_ERROR_END_OF_TLV);
     EXPECT_EQ(mockCommandSenderDelegate.mError, CHIP_ERROR_END_OF_TLV);
@@ -951,7 +960,7 @@ TEST_F(TestCommandInteraction, TestCommandInvalidMessage3)
 
 // Command Sender sends invoke request, command handler drops invoke response, then test injects malformed status response to
 // client, client responds to the status response with invalid action.
-TEST_F(TestCommandInteraction, TestCommandInvalidMessage4)
+TEST_F_FROM_FIXTURE(TestCommandInteraction, TestCommandInvalidMessage4)
 {
     CHIP_ERROR err = CHIP_NO_ERROR;
     mockCommandSenderDelegate.ResetCounter();
@@ -992,15 +1001,14 @@ TEST_F(TestCommandInteraction, TestCommandInvalidMessage4)
     // Since we are dropping packets, things are not getting acked.  Set up our
     // MRP state to look like what it would have looked like if the packet had
     // not gotten dropped.
-    chip::Test::CommandSenderTestAccess privatecommandSender(&commandSender);
-    PretendWeGotReplyFromServer(*mpTestContext, privatecommandSender.GetExchangeCtx().Get());
+    PretendWeGotReplyFromServer(*mpTestContext, commandSender.mExchangeCtx.Get());
 
     mpTestContext->GetLoopback().mSentMessageCount                 = 0;
     mpTestContext->GetLoopback().mNumMessagesToDrop                = 0;
     mpTestContext->GetLoopback().mNumMessagesToAllowBeforeDropping = 0;
     mpTestContext->GetLoopback().mDroppedMessageCount              = 0;
 
-    err = privatecommandSender.OnMessageReceived(privatecommandSender.GetExchangeCtx().Get(), payloadHeader, std::move(msgBuf));
+    err = commandSender.OnMessageReceived(commandSender.mExchangeCtx.Get(), payloadHeader, std::move(msgBuf));
 
     EXPECT_EQ(err, CHIP_ERROR_END_OF_TLV);
     EXPECT_EQ(mockCommandSenderDelegate.mError, CHIP_ERROR_END_OF_TLV);
@@ -1020,7 +1028,7 @@ TEST_F(TestCommandInteraction, TestCommandInvalidMessage4)
     mpTestContext->CreateSessionBobToAlice();
 }
 
-TEST_F(TestCommandInteraction, TestCommandSenderWithWrongState)
+TEST_F(TestCommandInteraction, TestCommandSender_WithWrongState)
 {
     CHIP_ERROR err = CHIP_NO_ERROR;
 
@@ -1031,7 +1039,7 @@ TEST_F(TestCommandInteraction, TestCommandSenderWithWrongState)
     EXPECT_EQ(err, CHIP_ERROR_INCORRECT_STATE);
 }
 
-TEST_F(TestCommandInteraction, TestCommandHandlerWithWrongState)
+TEST_F(TestCommandInteraction, TestCommandHandler_WithWrongState)
 {
     CHIP_ERROR err                          = CHIP_NO_ERROR;
     ConcreteCommandPath requestCommandPath  = { kTestEndpointId, kTestClusterId, kTestCommandIdNoData };
@@ -1052,7 +1060,7 @@ TEST_F(TestCommandInteraction, TestCommandHandlerWithWrongState)
     EXPECT_TRUE(commandHandler.mMockCommandResponder.mChunks.IsNull());
 }
 
-TEST_F(TestCommandInteraction, TestCommandSenderWithSendCommand)
+TEST_F_FROM_FIXTURE(TestCommandInteraction, TestCommandSender_WithSendCommand)
 {
     CHIP_ERROR err = CHIP_NO_ERROR;
 
@@ -1068,12 +1076,12 @@ TEST_F(TestCommandInteraction, TestCommandSenderWithSendCommand)
 
     GenerateInvokeResponse(buf, kTestCommandIdWithData);
     bool moreChunkedMessages = false;
-    err = chip::Test::CommandSenderTestAccess(&commandSender).ProcessInvokeResponse(std::move(buf), moreChunkedMessages);
+    err                      = commandSender.ProcessInvokeResponse(std::move(buf), moreChunkedMessages);
     EXPECT_EQ(err, CHIP_NO_ERROR);
     EXPECT_FALSE(moreChunkedMessages);
 }
 
-TEST_F(TestCommandInteraction, TestCommandHandlerWithSendEmptyCommand)
+TEST_F(TestCommandInteraction, TestCommandHandler_WithSendEmptyCommand)
 {
     CHIP_ERROR err                          = CHIP_NO_ERROR;
     ConcreteCommandPath requestCommandPath  = { kTestEndpointId, kTestClusterId, kTestCommandIdNoData };
@@ -1096,7 +1104,7 @@ TEST_F(TestCommandInteraction, TestCommandHandlerWithSendEmptyCommand)
     EXPECT_FALSE(commandHandler.mMockCommandResponder.mChunks.IsNull());
 }
 
-TEST_F(TestCommandInteraction, TestCommandSenderWithProcessReceivedMsg)
+TEST_F_FROM_FIXTURE(TestCommandInteraction, TestCommandSender_WithProcessReceivedMsg)
 {
     CHIP_ERROR err = CHIP_NO_ERROR;
 
@@ -1107,12 +1115,12 @@ TEST_F(TestCommandInteraction, TestCommandSenderWithProcessReceivedMsg)
     GenerateInvokeResponse(buf, kTestCommandIdWithData);
     bool moreChunkedMessages = false;
 
-    err = chip::Test::CommandSenderTestAccess(&commandSender).ProcessInvokeResponse(std::move(buf), moreChunkedMessages);
+    err = commandSender.ProcessInvokeResponse(std::move(buf), moreChunkedMessages);
     EXPECT_EQ(err, CHIP_NO_ERROR);
     EXPECT_FALSE(moreChunkedMessages);
 }
 
-TEST_F(TestCommandInteraction, TestCommandSenderExtendableApiWithProcessReceivedMsg)
+TEST_F_FROM_FIXTURE(TestCommandInteraction, TestCommandSender_ExtendableApiWithProcessReceivedMsg)
 {
     CHIP_ERROR err = CHIP_NO_ERROR;
 
@@ -1123,18 +1131,17 @@ TEST_F(TestCommandInteraction, TestCommandSenderExtendableApiWithProcessReceived
 
     uint16_t mockCommandRef = 1;
     pendingResponseTracker.Add(mockCommandRef);
-    chip::Test::CommandSenderTestAccess privatecommandSender(&commandSender);
-    privatecommandSender.SetFinishedCommandCount(1);
+    commandSender.mFinishedCommandCount = 1;
 
     System::PacketBufferHandle buf = System::PacketBufferHandle::New(System::PacketBuffer::kMaxSize);
 
     GenerateInvokeResponse(buf, kTestCommandIdWithData);
     bool moreChunkedMessages = false;
-    err                      = privatecommandSender.ProcessInvokeResponse(std::move(buf), moreChunkedMessages);
+    err                      = commandSender.ProcessInvokeResponse(std::move(buf), moreChunkedMessages);
     EXPECT_EQ(err, CHIP_NO_ERROR);
     EXPECT_FALSE(moreChunkedMessages);
 
-    privatecommandSender.FlushNoCommandResponse();
+    commandSender.FlushNoCommandResponse();
 
     EXPECT_EQ(mockCommandSenderExtendedDelegate.onResponseCalledTimes, 1);
     EXPECT_EQ(mockCommandSenderExtendedDelegate.onFinalCalledTimes, 0);
@@ -1142,7 +1149,7 @@ TEST_F(TestCommandInteraction, TestCommandSenderExtendableApiWithProcessReceived
     EXPECT_EQ(mockCommandSenderExtendedDelegate.onErrorCalledTimes, 0);
 }
 
-TEST_F(TestCommandInteraction, TestCommandSenderExtendableApiWithProcessReceivedMsgContainingInvalidCommandRef)
+TEST_F_FROM_FIXTURE(TestCommandInteraction, TestCommandSender_ExtendableApiWithProcessReceivedMsgContainingInvalidCommandRef)
 {
     CHIP_ERROR err = CHIP_NO_ERROR;
 
@@ -1153,9 +1160,8 @@ TEST_F(TestCommandInteraction, TestCommandSenderExtendableApiWithProcessReceived
 
     uint16_t mockCommandRef = 1;
     pendingResponseTracker.Add(mockCommandRef);
-    chip::Test::CommandSenderTestAccess privatecommandSender(&commandSender);
 
-    privatecommandSender.SetFinishedCommandCount(1);
+    commandSender.mFinishedCommandCount = 1;
 
     System::PacketBufferHandle buf = System::PacketBufferHandle::New(System::PacketBuffer::kMaxSize);
 
@@ -1163,11 +1169,11 @@ TEST_F(TestCommandInteraction, TestCommandSenderExtendableApiWithProcessReceived
     GenerateInvokeResponse(buf, kTestCommandIdWithData, kTestClusterId, kTestEndpointId,
                            std::make_optional(invalidResponseCommandRef));
     bool moreChunkedMessages = false;
-    err                      = privatecommandSender.ProcessInvokeResponse(std::move(buf), moreChunkedMessages);
+    err                      = commandSender.ProcessInvokeResponse(std::move(buf), moreChunkedMessages);
     EXPECT_EQ(err, CHIP_ERROR_KEY_NOT_FOUND);
     EXPECT_FALSE(moreChunkedMessages);
 
-    privatecommandSender.FlushNoCommandResponse();
+    commandSender.FlushNoCommandResponse();
 
     EXPECT_EQ(mockCommandSenderExtendedDelegate.onResponseCalledTimes, 0);
     EXPECT_EQ(mockCommandSenderExtendedDelegate.onFinalCalledTimes, 0);
@@ -1262,7 +1268,7 @@ TEST_F(TestCommandInteraction, TestCommandHandlerEncodeSimpleStatusCode)
     ValidateCommandHandlerEncodeInvokeResponseMessage(true /*aNeedStatusCode=true*/);
 }
 
-TEST_F(TestCommandInteraction, TestCommandHandlerWithoutResponderCallingAddStatus)
+TEST_F_FROM_FIXTURE(TestCommandInteraction, TestCommandHandler_WithoutResponderCallingAddStatus)
 {
     chip::app::ConcreteCommandPath requestCommandPath(kTestEndpointId, kTestClusterId, kTestCommandIdWithData);
     CommandHandler commandHandler(&mockCommandHandlerDelegate);
@@ -1271,10 +1277,10 @@ TEST_F(TestCommandInteraction, TestCommandHandlerWithoutResponderCallingAddStatu
 
     // Since calling AddStatus is supposed to be a no-operation when there is no responder, it is
     // hard to validate. Best way is to check that we are still in an Idle state afterwards
-    EXPECT_TRUE(chip::Test::CommandHandlerTestAccess(&commandHandler).TestOnlyIsInIdleState());
+    EXPECT_TRUE(commandHandler.TestOnlyIsInIdleState());
 }
 
-TEST_F(TestCommandInteraction, TestCommandHandlerWithoutResponderCallingAddResponse)
+TEST_F_FROM_FIXTURE(TestCommandInteraction, TestCommandHandler_WithoutResponderCallingAddResponse)
 {
     chip::app::ConcreteCommandPath requestCommandPath(kTestEndpointId, kTestClusterId, kTestCommandIdWithData);
     CommandHandler commandHandler(&mockCommandHandlerDelegate);
@@ -1285,10 +1291,10 @@ TEST_F(TestCommandInteraction, TestCommandHandlerWithoutResponderCallingAddRespo
 
     // Since calling AddResponseData is supposed to be a no-operation when there is no responder, it is
     // hard to validate. Best way is to check that we are still in an Idle state afterwards
-    EXPECT_TRUE(chip::Test::CommandHandlerTestAccess(&commandHandler).TestOnlyIsInIdleState());
+    EXPECT_TRUE(commandHandler.TestOnlyIsInIdleState());
 }
 
-TEST_F(TestCommandInteraction, TestCommandHandlerWithoutResponderCallingDirectPrepareFinishCommandApis)
+TEST_F_FROM_FIXTURE(TestCommandInteraction, TestCommandHandler_WithoutResponderCallingDirectPrepareFinishCommandApis)
 {
     chip::app::ConcreteCommandPath requestCommandPath(kTestEndpointId, kTestClusterId, kTestCommandIdWithData);
     CommandHandler commandHandler(&mockCommandHandlerDelegate);
@@ -1307,10 +1313,10 @@ TEST_F(TestCommandInteraction, TestCommandHandlerWithoutResponderCallingDirectPr
     err = commandHandler.FinishCommand();
     EXPECT_EQ(err, CHIP_ERROR_INCORRECT_STATE);
 
-    EXPECT_TRUE(chip::Test::CommandHandlerTestAccess(&commandHandler).TestOnlyIsInIdleState());
+    EXPECT_TRUE(commandHandler.TestOnlyIsInIdleState());
 }
 
-TEST_F(TestCommandInteraction, TestCommandHandlerWithOnInvokeReceivedNotExistCommand)
+TEST_F(TestCommandInteraction, TestCommandHandler_WithOnInvokeReceivedNotExistCommand)
 {
     System::PacketBufferHandle commandDatabuf = System::PacketBufferHandle::New(System::PacketBuffer::kMaxSize);
     // Use some invalid endpoint / cluster / command.
@@ -1329,7 +1335,7 @@ TEST_F(TestCommandInteraction, TestCommandHandlerWithOnInvokeReceivedNotExistCom
     EXPECT_FALSE(chip::isCommandDispatched);
 }
 
-TEST_F(TestCommandInteraction, TestCommandHandlerWithOnInvokeReceivedEmptyDataMsg)
+TEST_F(TestCommandInteraction, TestCommandHandler_WithOnInvokeReceivedEmptyDataMsg)
 {
     bool allBooleans[] = { true, false };
     for (auto messageIsTimed : allBooleans)
@@ -1382,7 +1388,7 @@ TEST_F(TestCommandInteraction, TestCommandSenderLegacyCallbackUnsupportedCommand
 }
 
 // Because UnsupportedCommand is a path specific error we will expect it to come via on response when using Extended Path.
-TEST_F(TestCommandInteraction, TestCommandSenderExtendableCallbackUnsupportedCommand)
+TEST_F(TestCommandInteraction, TestCommandSender_ExtendableCallbackUnsupportedCommand)
 {
     CHIP_ERROR err = CHIP_NO_ERROR;
 
@@ -1437,7 +1443,7 @@ TEST_F(TestCommandInteraction, TestCommandSenderLegacyCallbackBuildingBatchComma
     EXPECT_EQ(mpTestContext->GetExchangeManager().GetNumActiveExchanges(), 0u);
 }
 
-TEST_F(TestCommandInteraction, TestCommandSenderExtendableCallbackBuildingBatchDuplicateCommandRefFails)
+TEST_F(TestCommandInteraction, TestCommandSender_ExtendableCallbackBuildingBatchDuplicateCommandRefFails)
 {
     CHIP_ERROR err = CHIP_NO_ERROR;
     mockCommandSenderExtendedDelegate.ResetCounter();
@@ -1471,7 +1477,7 @@ TEST_F(TestCommandInteraction, TestCommandSenderExtendableCallbackBuildingBatchD
     EXPECT_EQ(mpTestContext->GetExchangeManager().GetNumActiveExchanges(), 0u);
 }
 
-TEST_F(TestCommandInteraction, TestCommandSenderExtendableCallbackBuildingBatchCommandSuccess)
+TEST_F(TestCommandInteraction, TestCommandSender_ExtendableCallbackBuildingBatchCommandSuccess)
 {
     CHIP_ERROR err = CHIP_NO_ERROR;
     mockCommandSenderExtendedDelegate.ResetCounter();
@@ -1658,7 +1664,7 @@ TEST_F(TestCommandInteraction, TestCommandSenderAbruptDestruction)
     EXPECT_EQ(GetNumActiveCommandResponderObjects(), 0u);
 }
 
-TEST_F(TestCommandInteraction, TestCommandHandlerRejectMultipleIdenticalCommands)
+TEST_F(TestCommandInteraction, TestCommandHandler_RejectMultipleIdenticalCommands)
 {
     CHIP_ERROR err = CHIP_NO_ERROR;
 
@@ -1706,7 +1712,7 @@ TEST_F(TestCommandInteraction, TestCommandHandlerRejectMultipleIdenticalCommands
 
 #if CONFIG_BUILD_FOR_HOST_UNIT_TEST
 
-TEST_F(TestCommandInteraction, TestCommandHandlerRejectsMultipleCommandsWithIdenticalCommandRef)
+TEST_F_FROM_FIXTURE(TestCommandInteraction, TestCommandHandler_RejectsMultipleCommandsWithIdenticalCommandRef)
 {
     CHIP_ERROR err = CHIP_NO_ERROR;
 
@@ -1753,14 +1759,13 @@ TEST_F(TestCommandInteraction, TestCommandHandlerRejectsMultipleCommandsWithIden
 
     // Hackery to steal the InvokeRequest buffer from commandSender.
     System::PacketBufferHandle commandDatabuf;
-    err = chip::Test::CommandSenderTestAccess(&commandSender).Finalize(commandDatabuf);
+    err = commandSender.Finalize(commandDatabuf);
     EXPECT_EQ(err, CHIP_NO_ERROR);
 
     mockCommandHandlerDelegate.ResetCounter();
     commandDispatchedCount = 0;
 
-    InteractionModel::Status status =
-        chip::Test::CommandHandlerTestAccess(&commandHandler).ProcessInvokeRequest(std::move(commandDatabuf), false);
+    InteractionModel::Status status = commandHandler.ProcessInvokeRequest(std::move(commandDatabuf), false);
     EXPECT_EQ(status, InteractionModel::Status::InvalidAction);
 
     EXPECT_EQ(commandDispatchedCount, 0u);
@@ -1768,7 +1773,7 @@ TEST_F(TestCommandInteraction, TestCommandHandlerRejectsMultipleCommandsWithIden
 
 #endif // CONFIG_BUILD_FOR_HOST_UNIT_TEST
 
-TEST_F(TestCommandInteraction, TestCommandHandlerRejectMultipleCommandsWhenHandlerOnlySupportsOne)
+TEST_F_FROM_FIXTURE(TestCommandInteraction, TestCommandHandler_RejectMultipleCommandsWhenHandlerOnlySupportsOne)
 {
     CHIP_ERROR err = CHIP_NO_ERROR;
 
@@ -1806,7 +1811,7 @@ TEST_F(TestCommandInteraction, TestCommandHandlerRejectMultipleCommandsWhenHandl
 
     // Hackery to steal the InvokeRequest buffer from commandSender.
     System::PacketBufferHandle commandDatabuf;
-    err = chip::Test::CommandSenderTestAccess(&commandSender).Finalize(commandDatabuf);
+    err = commandSender.Finalize(commandDatabuf);
     EXPECT_EQ(err, CHIP_NO_ERROR);
 
     mockCommandHandlerDelegate.ResetCounter();
@@ -1822,7 +1827,7 @@ TEST_F(TestCommandInteraction, TestCommandHandlerRejectMultipleCommandsWhenHandl
     EXPECT_EQ(commandDispatchedCount, 0u);
 }
 
-TEST_F(TestCommandInteraction, TestCommandHandlerAcceptMultipleCommands)
+TEST_F_FROM_FIXTURE(TestCommandInteraction, TestCommandHandler_AcceptMultipleCommands)
 {
     CHIP_ERROR err = CHIP_NO_ERROR;
 
@@ -1856,8 +1861,7 @@ TEST_F(TestCommandInteraction, TestCommandHandlerAcceptMultipleCommands)
             finishCommandParams.SetCommandRef(i);
             EXPECT_EQ(CHIP_NO_ERROR, commandSender.FinishCommand(finishCommandParams));
         }
-        // changing the state of commandSender to State::AddedCommand
-        chip::Test::CommandSenderTestAccess(&commandSender).MoveToStateAddedCommand();
+        commandSender.MoveToState(app::CommandSender::State::AddedCommand);
     }
 
     BasicCommandPathRegistry<4> basicCommandPathRegistry;
@@ -1867,30 +1871,29 @@ TEST_F(TestCommandInteraction, TestCommandHandlerAcceptMultipleCommands)
 
     // Hackery to steal the InvokeRequest buffer from commandSender.
     System::PacketBufferHandle commandDatabuf;
-    err = chip::Test::CommandSenderTestAccess(&commandSender).Finalize(commandDatabuf);
+    err = commandSender.Finalize(commandDatabuf);
     EXPECT_EQ(err, CHIP_NO_ERROR);
 
     sendResponse = true;
     mockCommandHandlerDelegate.ResetCounter();
     commandDispatchedCount = 0;
 
-    InteractionModel::Status status =
-        chip::Test::CommandHandlerTestAccess(&commandHandler).ProcessInvokeRequest(std::move(commandDatabuf), false);
+    InteractionModel::Status status = commandHandler.ProcessInvokeRequest(std::move(commandDatabuf), false);
     EXPECT_EQ(status, InteractionModel::Status::Success);
 
     EXPECT_EQ(commandDispatchedCount, 2u);
 }
 
-TEST_F(TestCommandInteraction, TestCommandHandler_FillUpInvokeResponseMessageWhereSecondResponseIsStatusResponse)
+TEST_F_FROM_FIXTURE(TestCommandInteraction, TestCommandHandler_FillUpInvokeResponseMessageWhereSecondResponseIsStatusResponse)
 {
     BasicCommandPathRegistry<4> basicCommandPathRegistry;
     MockCommandResponder mockCommandResponder;
     CommandHandler::TestOnlyOverrides testOnlyOverrides{ &basicCommandPathRegistry, &mockCommandResponder };
     CommandHandler commandHandler(testOnlyOverrides, &mockCommandHandlerDelegate);
 
-    chip::Test::CommandHandlerTestAccess(&commandHandler).SetReserveSpaceForMoreChunkMessages(true);
-    ConcreteCommandPath requestCommandPath1 = { kTestEndpointId, kTestClusterId, kTestCommandIdFillResponseMessage };
-    ConcreteCommandPath requestCommandPath2 = { kTestEndpointId, kTestClusterId, kTestCommandIdCommandSpecificResponse };
+    commandHandler.mReserveSpaceForMoreChunkMessages = true;
+    ConcreteCommandPath requestCommandPath1          = { kTestEndpointId, kTestClusterId, kTestCommandIdFillResponseMessage };
+    ConcreteCommandPath requestCommandPath2          = { kTestEndpointId, kTestClusterId, kTestCommandIdCommandSpecificResponse };
 
     CHIP_ERROR err = basicCommandPathRegistry.Add(requestCommandPath1, std::make_optional<uint16_t>(static_cast<uint16_t>(1)));
     EXPECT_EQ(err, CHIP_NO_ERROR);
@@ -1899,27 +1902,26 @@ TEST_F(TestCommandInteraction, TestCommandHandler_FillUpInvokeResponseMessageWhe
 
     uint32_t sizeToLeave = 0;
     FillCurrentInvokeResponseBuffer(&commandHandler, requestCommandPath1, sizeToLeave);
-    uint32_t remainingSize =
-        chip::Test::CommandHandlerTestAccess(&commandHandler).GetInvokeResponseBuilder().GetWriter()->GetRemainingFreeLength();
+    uint32_t remainingSize = commandHandler.mInvokeResponseBuilder.GetWriter()->GetRemainingFreeLength();
     EXPECT_EQ(remainingSize, sizeToLeave);
 
     AddInvokeResponseData(&commandHandler, /* aNeedStatusCode = */ true, kTestCommandIdCommandSpecificResponse,
                           kTestCommandIdCommandSpecificResponse);
 
-    remainingSize =
-        chip::Test::CommandHandlerTestAccess(&commandHandler).GetInvokeResponseBuilder().GetWriter()->GetRemainingFreeLength();
+    remainingSize = commandHandler.mInvokeResponseBuilder.GetWriter()->GetRemainingFreeLength();
     EXPECT_GT(remainingSize, sizeToLeave);
 }
-TEST_F(TestCommandInteraction, TestCommandHandler_FillUpInvokeResponseMessageWhereSecondResponseIsDataResponsePrimative)
+TEST_F_FROM_FIXTURE(TestCommandInteraction,
+                    TestCommandHandler_FillUpInvokeResponseMessageWhereSecondResponseIsDataResponsePrimative)
 {
     BasicCommandPathRegistry<4> basicCommandPathRegistry;
     MockCommandResponder mockCommandResponder;
     CommandHandler::TestOnlyOverrides testOnlyOverrides{ &basicCommandPathRegistry, &mockCommandResponder };
     CommandHandler commandHandler(testOnlyOverrides, &mockCommandHandlerDelegate);
 
-    chip::Test::CommandHandlerTestAccess(&commandHandler).SetReserveSpaceForMoreChunkMessages(true);
-    ConcreteCommandPath requestCommandPath1 = { kTestEndpointId, kTestClusterId, kTestCommandIdFillResponseMessage };
-    ConcreteCommandPath requestCommandPath2 = { kTestEndpointId, kTestClusterId, kTestCommandIdCommandSpecificResponse };
+    commandHandler.mReserveSpaceForMoreChunkMessages = true;
+    ConcreteCommandPath requestCommandPath1          = { kTestEndpointId, kTestClusterId, kTestCommandIdFillResponseMessage };
+    ConcreteCommandPath requestCommandPath2          = { kTestEndpointId, kTestClusterId, kTestCommandIdCommandSpecificResponse };
 
     CHIP_ERROR err = basicCommandPathRegistry.Add(requestCommandPath1, std::make_optional<uint16_t>(static_cast<uint16_t>(1)));
     EXPECT_EQ(err, CHIP_NO_ERROR);
@@ -1928,27 +1930,25 @@ TEST_F(TestCommandInteraction, TestCommandHandler_FillUpInvokeResponseMessageWhe
 
     uint32_t sizeToLeave = 0;
     FillCurrentInvokeResponseBuffer(&commandHandler, requestCommandPath1, sizeToLeave);
-    uint32_t remainingSize =
-        chip::Test::CommandHandlerTestAccess(&commandHandler).GetInvokeResponseBuilder().GetWriter()->GetRemainingFreeLength();
+    uint32_t remainingSize = commandHandler.mInvokeResponseBuilder.GetWriter()->GetRemainingFreeLength();
     EXPECT_EQ(remainingSize, sizeToLeave);
 
     AddInvokeResponseData(&commandHandler, /* aNeedStatusCode = */ false, kTestCommandIdCommandSpecificResponse,
                           kTestCommandIdCommandSpecificResponse);
 
-    remainingSize =
-        chip::Test::CommandHandlerTestAccess(&commandHandler).GetInvokeResponseBuilder().GetWriter()->GetRemainingFreeLength();
+    remainingSize = commandHandler.mInvokeResponseBuilder.GetWriter()->GetRemainingFreeLength();
     EXPECT_GT(remainingSize, sizeToLeave);
 }
 
-TEST_F(TestCommandInteraction, TestCommandHandler_FillUpInvokeResponseMessageWhereSecondResponseIsDataResponse)
+TEST_F_FROM_FIXTURE(TestCommandInteraction, TestCommandHandler_FillUpInvokeResponseMessageWhereSecondResponseIsDataResponse)
 {
     BasicCommandPathRegistry<4> basicCommandPathRegistry;
     MockCommandResponder mockCommandResponder;
     CommandHandler::TestOnlyOverrides testOnlyOverrides{ &basicCommandPathRegistry, &mockCommandResponder };
     CommandHandler commandHandler(testOnlyOverrides, &mockCommandHandlerDelegate);
-    chip::Test::CommandHandlerTestAccess(&commandHandler).SetReserveSpaceForMoreChunkMessages(true);
-    ConcreteCommandPath requestCommandPath1 = { kTestEndpointId, kTestClusterId, kTestCommandIdFillResponseMessage };
-    ConcreteCommandPath requestCommandPath2 = { kTestEndpointId, kTestClusterId, kTestCommandIdCommandSpecificResponse };
+    commandHandler.mReserveSpaceForMoreChunkMessages = true;
+    ConcreteCommandPath requestCommandPath1          = { kTestEndpointId, kTestClusterId, kTestCommandIdFillResponseMessage };
+    ConcreteCommandPath requestCommandPath2          = { kTestEndpointId, kTestClusterId, kTestCommandIdCommandSpecificResponse };
 
     CHIP_ERROR err = basicCommandPathRegistry.Add(requestCommandPath1, std::make_optional<uint16_t>(static_cast<uint16_t>(1)));
     EXPECT_EQ(err, CHIP_NO_ERROR);
@@ -1957,16 +1957,14 @@ TEST_F(TestCommandInteraction, TestCommandHandler_FillUpInvokeResponseMessageWhe
 
     uint32_t sizeToLeave = 0;
     FillCurrentInvokeResponseBuffer(&commandHandler, requestCommandPath1, sizeToLeave);
-    uint32_t remainingSize =
-        chip::Test::CommandHandlerTestAccess(&commandHandler).GetInvokeResponseBuilder().GetWriter()->GetRemainingFreeLength();
+    uint32_t remainingSize = commandHandler.mInvokeResponseBuilder.GetWriter()->GetRemainingFreeLength();
     EXPECT_EQ(remainingSize, sizeToLeave);
 
     uint32_t sizeToFill = 50;
     err                 = commandHandler.AddResponseData(requestCommandPath2, ForcedSizeBuffer(sizeToFill));
     EXPECT_EQ(err, CHIP_NO_ERROR);
 
-    remainingSize =
-        chip::Test::CommandHandlerTestAccess(&commandHandler).GetInvokeResponseBuilder().GetWriter()->GetRemainingFreeLength();
+    remainingSize = commandHandler.mInvokeResponseBuilder.GetWriter()->GetRemainingFreeLength();
     EXPECT_GT(remainingSize, sizeToLeave);
 }
 
@@ -1975,7 +1973,7 @@ TEST_F(TestCommandInteraction, TestCommandHandler_FillUpInvokeResponseMessageWhe
 // This test needs a special unit-test only API being exposed in ExchangeContext to be able to correctly simulate
 // the release of a session on the exchange.
 //
-TEST_F(TestCommandInteraction, TestCommandHandlerReleaseWithExchangeClosed)
+TEST_F_FROM_FIXTURE(TestCommandInteraction, TestCommandHandler_ReleaseWithExchangeClosed)
 {
     CHIP_ERROR err = CHIP_NO_ERROR;
 
@@ -1995,12 +1993,8 @@ TEST_F(TestCommandInteraction, TestCommandHandlerReleaseWithExchangeClosed)
 
     // Mimic closure of the exchange that would happen on a session release and verify that releasing the handle there-after
     // is handled gracefully.
-    chip::Test::CommandHandlerTestAccess(asyncCommandHandle.Get())
-        .GetmpResponder()
-        ->GetExchangeContext()
-        ->GetSessionHolder()
-        .Release();
-    chip::Test::CommandHandlerTestAccess(asyncCommandHandle.Get()).GetmpResponder()->GetExchangeContext()->OnSessionReleased();
+    asyncCommandHandle.Get()->mpResponder->GetExchangeContext()->GetSessionHolder().Release();
+    asyncCommandHandle.Get()->mpResponder->GetExchangeContext()->OnSessionReleased();
 
     asyncCommandHandle = nullptr;
 }

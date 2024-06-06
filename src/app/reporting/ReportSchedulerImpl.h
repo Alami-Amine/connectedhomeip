@@ -21,13 +21,6 @@
 #include <app/reporting/ReportScheduler.h>
 
 namespace chip {
-namespace Test {
-
-// Forward declaration of ReportSchedulerImplTestAccess class to allow it to be friend with the ReportSchedulerImpl class.
-// This is not for general API use. It is only to be used for (Unit) Tests to expose private Methods/Members.
-class ReportSchedulerImplTestAccess;
-
-} // namespace Test
 namespace app {
 namespace reporting {
 
@@ -160,7 +153,6 @@ protected:
 
 private:
     friend class chip::app::reporting::TestReportScheduler;
-    friend class chip::Test::ReportSchedulerImplTestAccess;
 
     /**
      * @brief Find the next timestamp when a report should be scheduled for a ReadHandler.

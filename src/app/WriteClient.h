@@ -42,13 +42,6 @@
 #include <system/TLVPacketBufferBackingStore.h>
 
 namespace chip {
-namespace Test {
-
-// Forward declaration of WriteClientTestAccess class to allow it to be friend with the WriteClient.
-// This is not for general API use. It is only to be used for (Unit) Tests to expose private Methods/Members.
-class WriteClientTestAccess;
-
-} // namespace Test
 namespace app {
 
 class InteractionModelEngine;
@@ -244,7 +237,6 @@ public:
 private:
     friend class TestWriteInteraction;
     friend class InteractionModelEngine;
-    friend class chip::Test::WriteClientTestAccess;
 
     enum class State
     {

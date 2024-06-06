@@ -24,11 +24,6 @@
 
 #include <cinttypes>
 
-#include <gtest/gtest.h>
-
-#include <app/tests/EngineTestAccess.h>
-#include <app/tests/ReadHandlerTestAccess.h>
-
 #include <app/ConcreteAttributePath.h>
 #include <app/InteractionModelEngine.h>
 #include <app/reporting/Engine.h>
@@ -39,8 +34,10 @@
 #include <lib/core/TLV.h>
 #include <lib/core/TLVDebug.h>
 #include <lib/core/TLVUtilities.h>
+#include <lib/support/tests/ExtraPwTestMacros.h>
 #include <messaging/ExchangeContext.h>
 #include <messaging/Flags.h>
+#include <pw_unit_test/framework.h>
 
 using TestContext = chip::Test::AppContext;
 
@@ -54,34 +51,38 @@ constexpr chip::AttributeId kTestFieldId2 = 2;
 namespace app {
 namespace reporting {
 
-std::unique_ptr<TestContext> pTestContext;
+std::unique_ptr<TestContext> mpTestContext;
 
 class TestReportingEngine : public ::testing::Test
 {
 public:
     static void SetUpTestSuite()
     {
-        if (pTestContext == nullptr)
+        if (mpTestContext == nullptr)
         {
-            pTestContext = std::make_unique<TestContext>();
-            ASSERT_NE(pTestContext, nullptr);
+            mpTestContext = std::make_unique<TestContext>();
+            ASSERT_NE(mpTestContext, nullptr);
         }
-        pTestContext->SetUpTestSuite();
+        mpTestContext->SetUpTestSuite();
     }
     static void TearDownTestSuite()
     {
-        pTestContext->TearDownTestSuite();
-        if (pTestContext != nullptr)
+        mpTestContext->TearDownTestSuite();
+        if (mpTestContext != nullptr)
         {
-            pTestContext.reset();
+            mpTestContext.reset();
         }
     }
-    void SetUp() { pTestContext->SetUp(); }
-    void TearDown() { pTestContext->TearDown(); }
+    void SetUp() { mpTestContext->SetUp(); }
+    void TearDown() { mpTestContext->TearDown(); }
 
     template <typename... Args>
     static bool VerifyDirtySetContent(const Args &... args);
     static bool InsertToDirtySet(const AttributePathParams & aPath);
+
+    void TestBuildAndSendSingleReportData();
+    void TestMergeOverlappedAttributePath();
+    void TestMergeAttributePathWhenDirtySetPoolExhausted();
 
 private:
     struct ExpectedDirtySetContent : public AttributePathParams
@@ -158,7 +159,7 @@ bool TestReportingEngine::InsertToDirtySet(const AttributePathParams & aPath)
     return true;
 }
 
-TEST_F(TestReportingEngine, TestBuildAndSendSingleReportData)
+TEST_F_FROM_FIXTURE(TestReportingEngine, TestBuildAndSendSingleReportData)
 {
     CHIP_ERROR err = CHIP_NO_ERROR;
     System::PacketBufferTLVWriter writer;
@@ -166,15 +167,14 @@ TEST_F(TestReportingEngine, TestBuildAndSendSingleReportData)
     ReadRequestMessage::Builder readRequestBuilder;
     DummyDelegate dummy;
 
-    err = InteractionModelEngine::GetInstance()->Init(&pTestContext->GetExchangeManager(), &pTestContext->GetFabricTable(),
+    err = InteractionModelEngine::GetInstance()->Init(&mpTestContext->GetExchangeManager(), &mpTestContext->GetFabricTable(),
                                                       app::reporting::GetDefaultReportScheduler());
     EXPECT_EQ(err, CHIP_NO_ERROR);
     TestExchangeDelegate delegate;
-    Messaging::ExchangeContext * exchangeCtx = pTestContext->NewExchangeToAlice(&delegate);
+    Messaging::ExchangeContext * exchangeCtx = mpTestContext->NewExchangeToAlice(&delegate);
 
     writer.Init(std::move(readRequestbuf));
-    err = readRequestBuilder.Init(&writer);
-    EXPECT_EQ(err, CHIP_NO_ERROR);
+    EXPECT_EQ(readRequestBuilder.Init(&writer), CHIP_NO_ERROR);
     AttributePathIBs::Builder & attributePathListBuilder = readRequestBuilder.CreateAttributeRequests();
     EXPECT_EQ(readRequestBuilder.GetError(), CHIP_NO_ERROR);
     AttributePathIB::Builder & attributePathBuilder1 = attributePathListBuilder.CreatePath();
@@ -191,42 +191,36 @@ TEST_F(TestReportingEngine, TestBuildAndSendSingleReportData)
     EXPECT_EQ(readRequestBuilder.GetError(), CHIP_NO_ERROR);
     readRequestBuilder.IsFabricFiltered(false).EndOfReadRequestMessage();
     EXPECT_EQ(readRequestBuilder.GetError(), CHIP_NO_ERROR);
-    err = writer.Finalize(&readRequestbuf);
-    EXPECT_EQ(err, CHIP_NO_ERROR);
+    EXPECT_EQ(writer.Finalize(&readRequestbuf), CHIP_NO_ERROR);
     app::ReadHandler readHandler(dummy, exchangeCtx, chip::app::ReadHandler::InteractionType::Read,
                                  app::reporting::GetDefaultReportScheduler());
-    chip::Test::ReadHandlerTestAccess privatereadHandler(&readHandler);
-    privatereadHandler.OnInitialRequest(std::move(readRequestbuf));
+    readHandler.OnInitialRequest(std::move(readRequestbuf));
 
-    err = chip::Test::EngineTestAccess(&(InteractionModelEngine::GetInstance()->GetReportingEngine()))
-              .BuildAndSendSingleReportData(privatereadHandler.GetReadHandler());
+    err = InteractionModelEngine::GetInstance()->GetReportingEngine().BuildAndSendSingleReportData(&readHandler);
 
-    pTestContext->DrainAndServiceIO();
+    mpTestContext->DrainAndServiceIO();
 
     EXPECT_EQ(err, CHIP_NO_ERROR);
 }
 
-TEST_F(TestReportingEngine, TestMergeOverlappedAttributePath)
+TEST_F_FROM_FIXTURE(TestReportingEngine, TestMergeOverlappedAttributePath)
 {
     CHIP_ERROR err = CHIP_NO_ERROR;
-    err = InteractionModelEngine::GetInstance()->Init(&pTestContext->GetExchangeManager(), &pTestContext->GetFabricTable(),
+    err = InteractionModelEngine::GetInstance()->Init(&mpTestContext->GetExchangeManager(), &mpTestContext->GetFabricTable(),
                                                       app::reporting::GetDefaultReportScheduler());
     EXPECT_EQ(err, CHIP_NO_ERROR);
 
-    AttributePathParams * clusterInfo = chip::Test::EngineTestAccess(&(InteractionModelEngine::GetInstance()->GetReportingEngine()))
-                                            .GetGlobalDirtySet()
-                                            .CreateObject();
-    clusterInfo->mEndpointId  = 1;
-    clusterInfo->mClusterId   = 1;
-    clusterInfo->mAttributeId = 1;
+    AttributePathParams * clusterInfo = InteractionModelEngine::GetInstance()->GetReportingEngine().mGlobalDirtySet.CreateObject();
+    clusterInfo->mEndpointId          = 1;
+    clusterInfo->mClusterId           = 1;
+    clusterInfo->mAttributeId         = 1;
 
     {
         AttributePathParams testClusterInfo;
         testClusterInfo.mEndpointId  = 1;
         testClusterInfo.mClusterId   = 1;
         testClusterInfo.mAttributeId = 3;
-        EXPECT_FALSE(chip::Test::EngineTestAccess(&(InteractionModelEngine::GetInstance()->GetReportingEngine()))
-                         .MergeOverlappedAttributePath(testClusterInfo));
+        EXPECT_FALSE(InteractionModelEngine::GetInstance()->GetReportingEngine().MergeOverlappedAttributePath(testClusterInfo));
     }
     {
         AttributePathParams testClusterInfo;
@@ -234,8 +228,7 @@ TEST_F(TestReportingEngine, TestMergeOverlappedAttributePath)
         testClusterInfo.mClusterId   = 1;
         testClusterInfo.mAttributeId = 1;
         testClusterInfo.mListIndex   = 2;
-        EXPECT_TRUE(chip::Test::EngineTestAccess(&(InteractionModelEngine::GetInstance()->GetReportingEngine()))
-                        .MergeOverlappedAttributePath(testClusterInfo));
+        EXPECT_TRUE(InteractionModelEngine::GetInstance()->GetReportingEngine().MergeOverlappedAttributePath(testClusterInfo));
     }
 
     {
@@ -243,16 +236,14 @@ TEST_F(TestReportingEngine, TestMergeOverlappedAttributePath)
         testClusterInfo.mEndpointId  = 1;
         testClusterInfo.mClusterId   = 1;
         testClusterInfo.mAttributeId = kInvalidAttributeId;
-        EXPECT_TRUE(chip::Test::EngineTestAccess(&(InteractionModelEngine::GetInstance()->GetReportingEngine()))
-                        .MergeOverlappedAttributePath(testClusterInfo));
+        EXPECT_TRUE(InteractionModelEngine::GetInstance()->GetReportingEngine().MergeOverlappedAttributePath(testClusterInfo));
     }
 
     {
         AttributePathParams testClusterInfo;
         testClusterInfo.mClusterId   = kInvalidClusterId;
         testClusterInfo.mAttributeId = kInvalidAttributeId;
-        EXPECT_TRUE(chip::Test::EngineTestAccess(&(InteractionModelEngine::GetInstance()->GetReportingEngine()))
-                        .MergeOverlappedAttributePath(testClusterInfo));
+        EXPECT_TRUE(InteractionModelEngine::GetInstance()->GetReportingEngine().MergeOverlappedAttributePath(testClusterInfo));
         EXPECT_TRUE(clusterInfo->mClusterId == kInvalidClusterId && clusterInfo->mAttributeId == kInvalidAttributeId);
     }
 
@@ -261,23 +252,22 @@ TEST_F(TestReportingEngine, TestMergeOverlappedAttributePath)
         testClusterInfo.mEndpointId  = kInvalidEndpointId;
         testClusterInfo.mClusterId   = kInvalidClusterId;
         testClusterInfo.mAttributeId = kInvalidAttributeId;
-        EXPECT_TRUE(chip::Test::EngineTestAccess(&(InteractionModelEngine::GetInstance()->GetReportingEngine()))
-                        .MergeOverlappedAttributePath(testClusterInfo));
+        EXPECT_TRUE(InteractionModelEngine::GetInstance()->GetReportingEngine().MergeOverlappedAttributePath(testClusterInfo));
         EXPECT_TRUE(clusterInfo->mEndpointId == kInvalidEndpointId && clusterInfo->mClusterId == kInvalidClusterId &&
                     clusterInfo->mAttributeId == kInvalidAttributeId);
     }
     InteractionModelEngine::GetInstance()->GetReportingEngine().Shutdown();
 }
 
-TEST_F(TestReportingEngine, TestMergeAttributePathWhenDirtySetPoolExhausted)
+TEST_F_FROM_FIXTURE(TestReportingEngine, TestMergeAttributePathWhenDirtySetPoolExhausted)
 {
     CHIP_ERROR err = CHIP_NO_ERROR;
-    err = InteractionModelEngine::GetInstance()->Init(&pTestContext->GetExchangeManager(), &pTestContext->GetFabricTable(),
+    err = InteractionModelEngine::GetInstance()->Init(&mpTestContext->GetExchangeManager(), &mpTestContext->GetFabricTable(),
                                                       app::reporting::GetDefaultReportScheduler());
     EXPECT_EQ(err, CHIP_NO_ERROR);
 
-    chip::Test::EngineTestAccess(&(InteractionModelEngine::GetInstance()->GetReportingEngine())).GetGlobalDirtySet().ReleaseAll();
-    chip::Test::EngineTestAccess(&(InteractionModelEngine::GetInstance()->GetReportingEngine())).BumpDirtySetGeneration();
+    InteractionModelEngine::GetInstance()->GetReportingEngine().mGlobalDirtySet.ReleaseAll();
+    InteractionModelEngine::GetInstance()->GetReportingEngine().BumpDirtySetGeneration();
 
     // Case 1: All dirty paths including the new one are under the same cluster.
     // -> Expected behavior: The dirty set is replaced by a wildcard attribute path under the same cluster.
@@ -285,13 +275,12 @@ TEST_F(TestReportingEngine, TestMergeAttributePathWhenDirtySetPoolExhausted)
     {
         EXPECT_TRUE(InsertToDirtySet(AttributePathParams(kTestEndpointId, kTestClusterId, i)));
     }
-    EXPECT_EQ(
-        CHIP_NO_ERROR,
-        chip::Test::EngineTestAccess(&(InteractionModelEngine::GetInstance()->GetReportingEngine()))
-            .InsertPathIntoDirtySet(AttributePathParams(kTestEndpointId, kTestClusterId, CHIP_IM_SERVER_MAX_NUM_DIRTY_SET + 1)));
+    EXPECT_EQ(CHIP_NO_ERROR,
+              InteractionModelEngine::GetInstance()->GetReportingEngine().InsertPathIntoDirtySet(
+                  AttributePathParams(kTestEndpointId, kTestClusterId, CHIP_IM_SERVER_MAX_NUM_DIRTY_SET + 1)));
     EXPECT_TRUE(VerifyDirtySetContent(AttributePathParams(kTestEndpointId, kTestClusterId)));
 
-    chip::Test::EngineTestAccess(&(InteractionModelEngine::GetInstance()->GetReportingEngine())).GetGlobalDirtySet().ReleaseAll();
+    InteractionModelEngine::GetInstance()->GetReportingEngine().mGlobalDirtySet.ReleaseAll();
 
     // Case 2: All dirty paths including the new one are under the same endpoint.
     // -> Expected behavior: The dirty set is replaced by a wildcard cluster path under the same endpoint.
@@ -299,13 +288,12 @@ TEST_F(TestReportingEngine, TestMergeAttributePathWhenDirtySetPoolExhausted)
     {
         EXPECT_TRUE(InsertToDirtySet(AttributePathParams(kTestEndpointId, i, 1)));
     }
-    EXPECT_EQ(
-        CHIP_NO_ERROR,
-        chip::Test::EngineTestAccess(&(InteractionModelEngine::GetInstance()->GetReportingEngine()))
-            .InsertPathIntoDirtySet(AttributePathParams(kTestEndpointId, ClusterId(CHIP_IM_SERVER_MAX_NUM_DIRTY_SET + 1), 1)));
+    EXPECT_EQ(CHIP_NO_ERROR,
+              InteractionModelEngine::GetInstance()->GetReportingEngine().InsertPathIntoDirtySet(
+                  AttributePathParams(kTestEndpointId, ClusterId(CHIP_IM_SERVER_MAX_NUM_DIRTY_SET + 1), 1)));
     EXPECT_TRUE(VerifyDirtySetContent(AttributePathParams(kTestEndpointId, kInvalidClusterId)));
 
-    chip::Test::EngineTestAccess(&(InteractionModelEngine::GetInstance()->GetReportingEngine())).GetGlobalDirtySet().ReleaseAll();
+    InteractionModelEngine::GetInstance()->GetReportingEngine().mGlobalDirtySet.ReleaseAll();
 
     // Case 3: All dirty paths including the new one are under the different endpoints.
     // -> Expected behavior: The dirty set is replaced by a wildcard endpoint.
@@ -314,11 +302,11 @@ TEST_F(TestReportingEngine, TestMergeAttributePathWhenDirtySetPoolExhausted)
         EXPECT_TRUE(InsertToDirtySet(AttributePathParams(EndpointId(i), i, i)));
     }
     EXPECT_EQ(CHIP_NO_ERROR,
-              chip::Test::EngineTestAccess(&(InteractionModelEngine::GetInstance()->GetReportingEngine()))
-                  .InsertPathIntoDirtySet(AttributePathParams(EndpointId(CHIP_IM_SERVER_MAX_NUM_DIRTY_SET + 1), 1, 1)));
+              InteractionModelEngine::GetInstance()->GetReportingEngine().InsertPathIntoDirtySet(
+                  AttributePathParams(EndpointId(CHIP_IM_SERVER_MAX_NUM_DIRTY_SET + 1), 1, 1)));
     EXPECT_TRUE(VerifyDirtySetContent(AttributePathParams()));
 
-    chip::Test::EngineTestAccess(&(InteractionModelEngine::GetInstance()->GetReportingEngine())).GetGlobalDirtySet().ReleaseAll();
+    InteractionModelEngine::GetInstance()->GetReportingEngine().mGlobalDirtySet.ReleaseAll();
 
     // Case 4: All existing dirty paths are under the same cluster, the new path comes from another cluster.
     // -> Expected behavior: The existing paths are merged into one single wildcard attribute path. New path is inserted
@@ -328,12 +316,12 @@ TEST_F(TestReportingEngine, TestMergeAttributePathWhenDirtySetPoolExhausted)
         EXPECT_TRUE(InsertToDirtySet(AttributePathParams(kTestEndpointId, kTestClusterId, i)));
     }
     EXPECT_EQ(CHIP_NO_ERROR,
-              chip::Test::EngineTestAccess(&(InteractionModelEngine::GetInstance()->GetReportingEngine()))
-                  .InsertPathIntoDirtySet(AttributePathParams(kTestEndpointId + 1, kTestClusterId + 1, 1)));
+              InteractionModelEngine::GetInstance()->GetReportingEngine().InsertPathIntoDirtySet(
+                  AttributePathParams(kTestEndpointId + 1, kTestClusterId + 1, 1)));
     EXPECT_TRUE(VerifyDirtySetContent(AttributePathParams(kTestEndpointId, kTestClusterId),
                                       AttributePathParams(kTestEndpointId + 1, kTestClusterId + 1, 1)));
 
-    chip::Test::EngineTestAccess(&(InteractionModelEngine::GetInstance()->GetReportingEngine())).GetGlobalDirtySet().ReleaseAll();
+    InteractionModelEngine::GetInstance()->GetReportingEngine().mGlobalDirtySet.ReleaseAll();
 
     // Case 5: All existing dirty paths are under the same endpoint, the new path comes from another endpoint.
     // -> Expected behavior: The existing paths are merged into one single wildcard cluster path. New path is inserted as-is.
@@ -342,8 +330,8 @@ TEST_F(TestReportingEngine, TestMergeAttributePathWhenDirtySetPoolExhausted)
         EXPECT_TRUE(InsertToDirtySet(AttributePathParams(kTestEndpointId, i, 1)));
     }
     EXPECT_EQ(CHIP_NO_ERROR,
-              chip::Test::EngineTestAccess(&(InteractionModelEngine::GetInstance()->GetReportingEngine()))
-                  .InsertPathIntoDirtySet(AttributePathParams(kTestEndpointId + 1, kTestClusterId + 1, 1)));
+              InteractionModelEngine::GetInstance()->GetReportingEngine().InsertPathIntoDirtySet(
+                  AttributePathParams(kTestEndpointId + 1, kTestClusterId + 1, 1)));
     EXPECT_TRUE(VerifyDirtySetContent(AttributePathParams(kTestEndpointId, kInvalidClusterId),
                                       AttributePathParams(kTestEndpointId + 1, kTestClusterId + 1, 1)));
 

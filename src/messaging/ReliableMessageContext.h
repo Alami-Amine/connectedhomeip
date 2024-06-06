@@ -36,9 +36,6 @@
 #include <transport/raw/MessageHeader.h>
 
 namespace chip {
-namespace Test {
-class ReliableMessageContextTestAccess;
-}
 namespace app {
 class TestCommandInteraction;
 class TestReadInteraction;
@@ -216,7 +213,6 @@ private:
     friend class ::chip::app::TestCommandInteraction;
     friend class ::chip::app::TestReadInteraction;
     friend class ::chip::app::TestWriteInteraction;
-    friend class ::chip::Test::ReliableMessageContextTestAccess;
 
     System::Clock::Timestamp mNextAckTime; // Next time for triggering Solo Ack
     uint32_t mPendingPeerAckMessageCounter;

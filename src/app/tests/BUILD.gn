@@ -175,19 +175,6 @@ chip_test_suite("tests") {
 
   cflags = [ "-Wconversion" ]
 
-  sources = [
-    "CommandHandlerTestAccess.h",
-    "CommandSenderTestAccess.h",
-    "EngineTestAccess.h",
-    "InteractionModelEngineTestAccess.h",
-    "ReadClientTestAccess.h",
-    "ReadHandlerTestAccess.h",
-    "ReportSchedulerImplTestAccess.h",
-    "SynchronizedReportSchedulerImplTestAccess.h",
-    "WriteClientTestAccess.h",
-    "WriteHandlerTestAccess.h",
-  ]
-
   public_deps = [
     ":app-test-stubs",
     ":binding-test-srcs",
@@ -204,6 +191,7 @@ chip_test_suite("tests") {
     "${chip_root}/src/lib/core:string-builder-adapters",
     "${chip_root}/src/lib/support:test_utils",
     "${chip_root}/src/lib/support:testing",
+    "${chip_root}/src/lib/support/tests:pw-test-macros",
   ]
 
   if (chip_config_network_layer_ble &&

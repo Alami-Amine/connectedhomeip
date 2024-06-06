@@ -35,13 +35,6 @@
 #include <system/TLVPacketBufferBackingStore.h>
 
 namespace chip {
-namespace Test {
-
-// Forward declaration of WriteHandlerTestAccess class to allow it to be friend with the WriteHandler class.
-// This is not for general API use. It is only to be used for (Unit) Tests to expose private Methods/Members.
-class WriteHandlerTestAccess;
-
-} // namespace Test
 namespace app {
 
 class WriteHandler;
@@ -139,8 +132,6 @@ public:
 
 private:
     friend class TestWriteInteraction;
-    friend class chip::Test::WriteHandlerTestAccess;
-
     enum class State
     {
         Uninitialized = 0, // The handler has not been initialized

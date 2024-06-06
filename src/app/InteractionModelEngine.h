@@ -75,12 +75,6 @@
 #endif                                 // CHIP_CONFIG_ENABLE_ICD_SERVER
 
 namespace chip {
-namespace Test {
-
-// Forward declaration of  InteractionModelEngineTestAccess class to allow it to be friend with InteractionModelEngine.
-// This is not for general API use. It is only to be used for (Unit) Tests to expose private Methods/Members.
-class InteractionModelEngineTestAccess;
-} // namespace Test
 namespace app {
 
 /**
@@ -422,7 +416,6 @@ private:
     friend class TestCommandInteraction;
     friend class TestInteractionModelEngine;
     friend class SubscriptionResumptionSessionEstablisher;
-    friend class chip::Test::InteractionModelEngineTestAccess;
     using Status = Protocols::InteractionModel::Status;
 
     void OnDone(CommandResponseSender & apResponderObj) override;

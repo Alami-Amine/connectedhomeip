@@ -23,8 +23,6 @@
 #include <app/InteractionModelEngine.h>
 #include <app/reporting/tests/MockReportScheduler.h>
 #include <app/tests/AppTestContext.h>
-#include <app/tests/WriteClientTestAccess.h>
-#include <app/tests/WriteHandlerTestAccess.h>
 #include <app/tests/test-interaction-model-api.h>
 #include <credentials/GroupDataProviderImpl.h>
 #include <crypto/DefaultSessionKeystore.h>
@@ -36,9 +34,9 @@
 #include <lib/core/TLVUtilities.h>
 #include <lib/support/TestGroupData.h>
 #include <lib/support/TestPersistentStorageDelegate.h>
+#include <lib/support/tests/ExtraPwTestMacros.h>
 #include <messaging/ExchangeContext.h>
 #include <messaging/Flags.h>
-#include <messaging/tests/ReliableMessageContextTestAccess.h>
 #include <pw_unit_test/framework.h>
 
 /**
@@ -70,8 +68,7 @@
         EXPECT_EQ(localRm->TestGetCountRetransTable(), 1);                                                                         \
                                                                                                                                    \
         localRm->EnumerateRetransTable([localExchange](auto * entry) {                                                             \
-            chip::Test::ReliableMessageContextTestAccess(localExchange)                                                            \
-                .SetPendingPeerAckMessageCounter(entry->retainedBuf.GetMessageCounter());                                          \
+            localExchange->SetPendingPeerAckMessageCounter(entry->retainedBuf.GetMessageCounter());                                \
             return Loop::Break;                                                                                                    \
         });                                                                                                                        \
     }
@@ -140,6 +137,14 @@ public:
         }
     }
     static TestContext * mpTestContext;
+
+    void TestWriteClient();
+    void TestWriteClientGroup();
+    void TestWriteHandlerReceiveInvalidMessage();
+    void TestWriteInvalidMessage1();
+    void TestWriteInvalidMessage2();
+    void TestWriteInvalidMessage3();
+    void TestWriteInvalidMessage4();
 
     static void AddAttributeDataIB(WriteClient & aWriteClient);
     static void AddAttributeStatus(WriteHandler & aWriteHandler);
@@ -305,7 +310,7 @@ void TestWriteInteraction::GenerateWriteResponse(System::PacketBufferHandle & aP
     EXPECT_EQ(err, CHIP_NO_ERROR);
 }
 
-TEST_F(TestWriteInteraction, TestWriteClient)
+TEST_F_FROM_FIXTURE(TestWriteInteraction, TestWriteClient)
 {
 
     CHIP_ERROR err = CHIP_NO_ERROR;
@@ -323,18 +328,16 @@ TEST_F(TestWriteInteraction, TestWriteClient)
 
     GenerateWriteResponse(buf);
 
-    chip::Test::WriteClientTestAccess privatewriteClient(&writeClient);
-
-    err = privatewriteClient.ProcessWriteResponseMessage(std::move(buf));
+    err = writeClient.ProcessWriteResponseMessage(std::move(buf));
     EXPECT_EQ(err, CHIP_NO_ERROR);
 
-    privatewriteClient.Close();
+    writeClient.Close();
 
     Messaging::ReliableMessageMgr * rm = mpTestContext->GetExchangeManager().GetReliableMessageMgr();
     EXPECT_EQ(rm->TestGetCountRetransTable(), 0);
 }
 
-TEST_F(TestWriteInteraction, TestWriteClientGroup)
+TEST_F_FROM_FIXTURE(TestWriteInteraction, TestWriteClientGroup)
 {
 
     CHIP_ERROR err = CHIP_NO_ERROR;
@@ -353,9 +356,9 @@ TEST_F(TestWriteInteraction, TestWriteClientGroup)
     EXPECT_EQ(err, CHIP_NO_ERROR);
 
     mpTestContext->DrainAndServiceIO();
-    chip::Test::WriteClientTestAccess privatewriteClient(&writeClient);
+
     // The WriteClient should be shutdown once we SendWriteRequest for group.
-    EXPECT_EQ(privatewriteClient.GetState(), privatewriteClient.GetEnumStateAwaitingDestruction());
+    EXPECT_EQ(writeClient.mState, WriteClient::State::AwaitingDestruction);
 }
 
 TEST_F(TestWriteInteraction, TestWriteHandler)
@@ -611,7 +614,7 @@ TEST_F(TestWriteInteraction, TestWriteRoundtrip)
 // This test creates a chunked write request, we drop the second write chunk message, then write handler receives unknown
 // report message and sends out a status report with invalid action.
 #if CONFIG_BUILD_FOR_HOST_UNIT_TEST
-TEST_F(TestWriteInteraction, TestWriteHandlerReceiveInvalidMessage)
+TEST_F_FROM_FIXTURE(TestWriteInteraction, TestWriteHandlerReceiveInvalidMessage)
 {
     auto sessionHandle = mpTestContext->GetSessionBobToAlice();
 
@@ -662,13 +665,12 @@ TEST_F(TestWriteInteraction, TestWriteHandlerReceiveInvalidMessage)
     payloadHeader.SetMessageType(chip::Protocols::InteractionModel::MsgType::ReportData);
 
     auto * writeHandler = InteractionModelEngine::GetInstance()->ActiveWriteHandlerAt(0);
-    chip::Test::WriteHandlerTestAccess privatewriteHandler(writeHandler);
 
-    rm->ClearRetransTable(chip::Test::WriteClientTestAccess(&writeClient).GetExchangeCtx().Get());
-    rm->ClearRetransTable(privatewriteHandler.GetExchangeCtx().Get());
+    rm->ClearRetransTable(writeClient.mExchangeCtx.Get());
+    rm->ClearRetransTable(writeHandler->mExchangeCtx.Get());
     mpTestContext->GetLoopback().mSentMessageCount  = 0;
     mpTestContext->GetLoopback().mNumMessagesToDrop = 0;
-    privatewriteHandler.OnMessageReceived(privatewriteHandler.GetExchangeCtx().Get(), payloadHeader, std::move(msgBuf));
+    writeHandler->OnMessageReceived(writeHandler->mExchangeCtx.Get(), payloadHeader, std::move(msgBuf));
     mpTestContext->DrainAndServiceIO();
 
     EXPECT_EQ(writeCallback.mLastErrorReason.mStatus, Protocols::InteractionModel::Status::InvalidAction);
@@ -733,7 +735,7 @@ TEST_F(TestWriteInteraction, TestWriteHandlerInvalidateFabric)
 #endif
 
 // Write Client sends a write request, receives an unexpected message type, sends a status response to that.
-TEST_F(TestWriteInteraction, TestWriteInvalidMessage1)
+TEST_F_FROM_FIXTURE(TestWriteInteraction, TestWriteInvalidMessage1)
 {
 
     CHIP_ERROR err = CHIP_NO_ERROR;
@@ -779,17 +781,16 @@ TEST_F(TestWriteInteraction, TestWriteInvalidMessage1)
     payloadHeader.SetExchangeID(0);
     payloadHeader.SetMessageType(chip::Protocols::InteractionModel::MsgType::ReportData);
 
-    chip::Test::WriteClientTestAccess privatewriteClient(&writeClient);
     // Since we are dropping packets, things are not getting acked.  Set up
     // our MRP state to look like what it would have looked like if the
     // packet had not gotten dropped.
-    PretendWeGotReplyFromServer(*mpTestContext, privatewriteClient.GetExchangeCtx().Get());
+    PretendWeGotReplyFromServer(*mpTestContext, writeClient.mExchangeCtx.Get());
 
     mpTestContext->GetLoopback().mSentMessageCount                 = 0;
     mpTestContext->GetLoopback().mNumMessagesToDrop                = 0;
     mpTestContext->GetLoopback().mNumMessagesToAllowBeforeDropping = 0;
     mpTestContext->GetLoopback().mDroppedMessageCount              = 0;
-    err = privatewriteClient.OnMessageReceived(privatewriteClient.GetExchangeCtx().Get(), payloadHeader, std::move(msgBuf));
+    err = writeClient.OnMessageReceived(writeClient.mExchangeCtx.Get(), payloadHeader, std::move(msgBuf));
     EXPECT_EQ(err, CHIP_ERROR_INVALID_MESSAGE_TYPE);
     mpTestContext->DrainAndServiceIO();
     EXPECT_EQ(callback.mError, CHIP_ERROR_INVALID_MESSAGE_TYPE);
@@ -810,7 +811,7 @@ TEST_F(TestWriteInteraction, TestWriteInvalidMessage1)
 }
 
 // Write Client sends a write request, receives a malformed write response message, sends a Status Report.
-TEST_F(TestWriteInteraction, TestWriteInvalidMessage2)
+TEST_F_FROM_FIXTURE(TestWriteInteraction, TestWriteInvalidMessage2)
 {
 
     CHIP_ERROR err = CHIP_NO_ERROR;
@@ -856,18 +857,16 @@ TEST_F(TestWriteInteraction, TestWriteInvalidMessage2)
     payloadHeader.SetExchangeID(0);
     payloadHeader.SetMessageType(chip::Protocols::InteractionModel::MsgType::WriteResponse);
 
-    chip::Test::WriteClientTestAccess privatewriteClient(&writeClient);
-
     // Since we are dropping packets, things are not getting acked.  Set up
     // our MRP state to look like what it would have looked like if the
     // packet had not gotten dropped.
-    PretendWeGotReplyFromServer(*mpTestContext, privatewriteClient.GetExchangeCtx().Get());
+    PretendWeGotReplyFromServer(*mpTestContext, writeClient.mExchangeCtx.Get());
 
     mpTestContext->GetLoopback().mSentMessageCount                 = 0;
     mpTestContext->GetLoopback().mNumMessagesToDrop                = 0;
     mpTestContext->GetLoopback().mNumMessagesToAllowBeforeDropping = 0;
     mpTestContext->GetLoopback().mDroppedMessageCount              = 0;
-    err = privatewriteClient.OnMessageReceived(privatewriteClient.GetExchangeCtx().Get(), payloadHeader, std::move(msgBuf));
+    err = writeClient.OnMessageReceived(writeClient.mExchangeCtx.Get(), payloadHeader, std::move(msgBuf));
     EXPECT_EQ(err, CHIP_ERROR_END_OF_TLV);
     mpTestContext->DrainAndServiceIO();
     EXPECT_EQ(callback.mError, CHIP_ERROR_END_OF_TLV);
@@ -887,7 +886,7 @@ TEST_F(TestWriteInteraction, TestWriteInvalidMessage2)
 }
 
 // Write Client sends a write request, receives a malformed status response message.
-TEST_F(TestWriteInteraction, TestWriteInvalidMessage3)
+TEST_F_FROM_FIXTURE(TestWriteInteraction, TestWriteInvalidMessage3)
 {
 
     CHIP_ERROR err = CHIP_NO_ERROR;
@@ -933,18 +932,16 @@ TEST_F(TestWriteInteraction, TestWriteInvalidMessage3)
     payloadHeader.SetExchangeID(0);
     payloadHeader.SetMessageType(chip::Protocols::InteractionModel::MsgType::StatusResponse);
 
-    chip::Test::WriteClientTestAccess privatewriteClient(&writeClient);
-
     // Since we are dropping packets, things are not getting acked.  Set up
     // our MRP state to look like what it would have looked like if the
     // packet had not gotten dropped.
-    PretendWeGotReplyFromServer(*mpTestContext, privatewriteClient.GetExchangeCtx().Get());
+    PretendWeGotReplyFromServer(*mpTestContext, writeClient.mExchangeCtx.Get());
 
     mpTestContext->GetLoopback().mSentMessageCount                 = 0;
     mpTestContext->GetLoopback().mNumMessagesToDrop                = 0;
     mpTestContext->GetLoopback().mNumMessagesToAllowBeforeDropping = 0;
     mpTestContext->GetLoopback().mDroppedMessageCount              = 0;
-    err = privatewriteClient.OnMessageReceived(privatewriteClient.GetExchangeCtx().Get(), payloadHeader, std::move(msgBuf));
+    err = writeClient.OnMessageReceived(writeClient.mExchangeCtx.Get(), payloadHeader, std::move(msgBuf));
     EXPECT_EQ(err, CHIP_ERROR_END_OF_TLV);
     mpTestContext->DrainAndServiceIO();
     EXPECT_EQ(callback.mError, CHIP_ERROR_END_OF_TLV);
@@ -965,7 +962,7 @@ TEST_F(TestWriteInteraction, TestWriteInvalidMessage3)
 }
 
 // Write Client sends a write request, receives a busy status response message.
-TEST_F(TestWriteInteraction, TestWriteInvalidMessage4)
+TEST_F_FROM_FIXTURE(TestWriteInteraction, TestWriteInvalidMessage4)
 {
 
     CHIP_ERROR err = CHIP_NO_ERROR;
@@ -1012,17 +1009,16 @@ TEST_F(TestWriteInteraction, TestWriteInvalidMessage4)
     payloadHeader.SetExchangeID(0);
     payloadHeader.SetMessageType(chip::Protocols::InteractionModel::MsgType::StatusResponse);
 
-    chip::Test::WriteClientTestAccess privatewriteClient(&writeClient);
     // Since we are dropping packets, things are not getting acked.  Set up
     // our MRP state to look like what it would have looked like if the
     // packet had not gotten dropped.
-    PretendWeGotReplyFromServer(*mpTestContext, privatewriteClient.GetExchangeCtx().Get());
+    PretendWeGotReplyFromServer(*mpTestContext, writeClient.mExchangeCtx.Get());
 
     mpTestContext->GetLoopback().mSentMessageCount                 = 0;
     mpTestContext->GetLoopback().mNumMessagesToDrop                = 0;
     mpTestContext->GetLoopback().mNumMessagesToAllowBeforeDropping = 0;
     mpTestContext->GetLoopback().mDroppedMessageCount              = 0;
-    err = privatewriteClient.OnMessageReceived(privatewriteClient.GetExchangeCtx().Get(), payloadHeader, std::move(msgBuf));
+    err = writeClient.OnMessageReceived(writeClient.mExchangeCtx.Get(), payloadHeader, std::move(msgBuf));
     EXPECT_EQ(err, CHIP_IM_GLOBAL_STATUS(Busy));
     mpTestContext->DrainAndServiceIO();
     EXPECT_EQ(callback.mError, CHIP_IM_GLOBAL_STATUS(Busy));

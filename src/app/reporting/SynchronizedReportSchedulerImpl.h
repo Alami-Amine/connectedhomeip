@@ -21,14 +21,6 @@
 #include <app/reporting/ReportSchedulerImpl.h>
 
 namespace chip {
-namespace Test {
-
-// Forward declaration of SynchronizedReportSchedulerImplTestAccess class to allow it to be friend with the
-// SynchronizedReportSchedulerImpl class.
-// This is not for general API use. It is only to be used for (Unit) Tests to expose private Methods/Members.
-class SynchronizedReportSchedulerImplTestAccess;
-
-} // namespace Test
 namespace app {
 namespace reporting {
 
@@ -125,7 +117,6 @@ protected:
 
 private:
     friend class chip::app::reporting::TestReportScheduler;
-    friend class chip::Test::SynchronizedReportSchedulerImplTestAccess;
 
     /**
      * @brief Find the highest minimum timestamp possible that still respects the lowest max timestamp and sets it as the common
