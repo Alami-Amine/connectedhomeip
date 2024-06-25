@@ -59,6 +59,9 @@ if (current_toolchain != "${dir_pw_toolchain}/default:default") {
         "${chip_root}/src/lib/format/tests:fuzz-payload-decoder",
       ]
     }
+    group("pw_fuzz_tests") {
+      deps = []
+    }
   }
 
   # Matter's in-tree pw_python_package or pw_python_distribution targets.
@@ -502,6 +505,16 @@ if (current_toolchain != "${dir_pw_toolchain}/default:default") {
     }
 
     builds += [ ":fake_platform" ]
+  }
+
+  ## TODO: check names used
+  ## TODO: check if I should keep the build += (maybe to allow this to be built withj all builds, unlike standalone)
+  if (pw_enable_fuzz_test_targets) {
+    chip_build("pw_fuzz") {
+      toolchain = "${build_root}/toolchain/pw_fuzzer:clang_pw_fuzz"
+    }
+
+    builds += [ ":pw_fuzz" ]
   }
 
   standalone_toolchain = "${chip_root}/config/standalone/toolchain:standalone"

@@ -1,0 +1,121 @@
+# Copyright (c) 2024 Project CHIP Authors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+import("//build_overrides/build.gni")
+
+import("${build_root}/toolchain/gcc_toolchain.gni")
+
+import("$dir_pigweed/targets/host/target_toolchains.gni")
+
+gcc_toolchain("clang_pw_fuzz") {
+  toolchain_args = {
+    name = "clang_pw_fuzz"
+    forward_variables_from(pw_target_toolchain_host.clang_fuzz, "*", [ "name" ])
+    pw_unit_test_MAIN = "$dir_pw_fuzzer:fuzztest_main"
+    pw_unit_test_BACKEND = "$dir_pw_fuzzer:gtest"
+
+    current_os = host_os
+    current_cpu = host_cpu
+    is_clang = true
+
+    pw_toolchain_FUZZING_ENABLED = true
+    treat_warnings_as_errors = false
+    dir_pw_third_party_abseil_cpp = "//third_party/abseil-cpp/src"
+    dir_pw_third_party_fuzztest = "//third_party/fuzztest"
+    dir_pw_third_party_googletest = "//third_party/googletest"
+    dir_pw_third_party_re2 = "//third_party/re2/src"
+
+    # use below if above dont work
+    #dir_pw_third_party_abseil_cpp="//third_party/abseil-cpp"
+    #dir_pw_third_party_re2 = "//third_party/re2"
+  }
+}
+
+############################### DELETE ##################################################
+
+gcc_toolchain("linux_x64_gcc") {
+  toolchain_args = {
+    current_os = "linux"
+    current_cpu = "x64"
+    is_clang = false
+  }
+}
+
+gcc_toolchain("linux_x64_clang") {
+  toolchain_args = {
+    current_os = "linux"
+    current_cpu = "x64"
+    is_clang = true
+  }
+}
+
+gcc_toolchain("linux_x86_gcc") {
+  toolchain_args = {
+    current_os = "linux"
+    current_cpu = "x86"
+    is_clang = false
+  }
+}
+
+gcc_toolchain("linux_x86_clang") {
+  toolchain_args = {
+    current_os = "linux"
+    current_cpu = "x86"
+    is_clang = true
+  }
+}
+
+gcc_toolchain("linux_arm_gcc") {
+  _toolprefix = "arm-linux-gnueabihf-"
+
+  cc = "${_toolprefix}gcc"
+  cxx = "${_toolprefix}g++"
+  ar = "${_toolprefix}ar"
+
+  toolchain_args = {
+    current_os = "linux"
+    current_cpu = "arm"
+    is_clang = false
+  }
+}
+
+gcc_toolchain("linux_arm_clang") {
+  toolchain_args = {
+    current_os = "linux"
+    current_cpu = "arm"
+    is_clang = true
+  }
+}
+
+gcc_toolchain("linux_arm64_gcc") {
+  _toolprefix = "aarch64-linux-gnu-"
+
+  cc = "${_toolprefix}gcc"
+  cxx = "${_toolprefix}g++"
+  ar = "${_toolprefix}ar"
+
+  toolchain_args = {
+    current_os = "linux"
+    current_cpu = "arm64"
+    is_clang = false
+  }
+}
+
+gcc_toolchain("linux_arm64_clang") {
+  toolchain_args = {
+    current_os = "linux"
+    current_cpu = "arm64"
+    is_clang = true
+  }
+}

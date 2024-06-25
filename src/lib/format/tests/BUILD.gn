@@ -56,3 +56,24 @@ if (enable_fuzz_test_targets) {
     ]
   }
 }
+
+if (pw_enable_fuzz_test_targets) {
+  # DOCSTAG: [pwfuzzer_examples_fuzztest-gn]
+  pw_test("FuzzPayloadDecoderPW") {
+    sources = [ "FuzzPayloadDecoderPW.cpp" ]
+    deps = [
+      ":pw_module_tests.run($dir_pigweed/targets/host:host_clang_fuzz)",
+      "$dir_pw_fuzzer:fuzztest",  # <- Added!
+    ]
+    public_deps = [
+      "${chip_root}/src/controller/data_model:cluster-tlv-metadata",
+      "${chip_root}/src/lib/core",
+      "${chip_root}/src/lib/format:flat-tree",
+      "${chip_root}/src/lib/format:protocol-decoder",
+      "${chip_root}/src/lib/format:protocol-tlv-metadata",
+      "${chip_root}/src/lib/support",
+      "${chip_root}/src/platform/logging:stdio",
+    ]
+    enable_if = false
+  }
+}
