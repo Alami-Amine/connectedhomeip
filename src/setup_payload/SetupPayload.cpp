@@ -121,11 +121,12 @@ bool PayloadContents::operator==(const PayloadContents & input) const
 
 CHIP_ERROR SetupPayload::addOptionalVendorData(uint8_t tag, std::string data)
 {
+    //just a test
     OptionalQRCodeInfo info;
     info.tag  = tag;
     info.type = optionalQRCodeInfoTypeString;
     info.data = std::move(data);
-
+	
     return addOptionalVendorData(info);
 }
 
