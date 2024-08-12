@@ -42,6 +42,9 @@ from .exceptions import ChipStackError, ChipStackException, DeviceError
 from .interaction_model import delegate as im
 from .storage import PersistentStorage
 
+from typing import TYPE_CHECKING, cast
+
+
 __all__ = [
     "DeviceStatusStruct",
     "ChipStackException",
@@ -284,3 +287,11 @@ class ChipStack(object):
             self._ChipStackLib.pychip_DeviceController_PostTaskOnChipThread.argtypes = [
                 _ChipThreadTaskRunnerFunct, py_object]
             self._ChipStackLib.pychip_DeviceController_PostTaskOnChipThread.restype = PyChipError
+
+
+if TYPE_CHECKING:
+    builtins.chipStack: 'ChipStack'
+
+
+# Directly annotate builtins.chipStack
+# builtins.chipStack: ChipStack

@@ -30,6 +30,7 @@ from __future__ import absolute_import, annotations, print_function
 
 import asyncio
 import builtins
+from builtins import chipStack #AMINE NOTE: it seems that this is what made chipStack work after these changes
 import concurrent.futures
 import copy
 import ctypes
@@ -55,6 +56,10 @@ from .clusters.CHIPClusters import ChipClusters
 from .crypto import p256keypair
 from .interaction_model import SessionParameters, SessionParametersStruct
 from .native import PyChipError
+
+from chip import ChipStack
+chipStack = typing.cast(ChipStack, chipStack)
+
 
 __all__ = ["ChipDeviceController", "CommissioningParameters"]
 
@@ -328,11 +333,11 @@ class DeviceProxyWrapper():
 
     def __del__(self):
         # Commissionee device proxies are owned by the DeviceCommissioner. See #33031
-        if (self._proxyType == self.DeviceProxyType.OPERATIONAL and self._dmLib is not None and hasattr(builtins, 'chipStack') and builtins.chipStack is not None):
+        if (self._proxyType == self.DeviceProxyType.OPERATIONAL and self._dmLib is not None and hasattr(builtins, 'chipStack') and chipStack is not None):
             # This destructor is called from any threading context, including on the Matter threading context.
             # So, we cannot call chipStack.Call or chipStack.CallAsyncWithCompleteCallback which waits for the posted work to
             # actually be executed. Instead, we just post/schedule the work and move on.
-            builtins.chipStack.PostTaskOnChipThread(lambda: self._dmLib.pychip_FreeOperationalDeviceProxy(self._deviceProxy))
+            chipStack.PostTaskOnChipThread(lambda: self._dmLib.pychip_FreeOperationalDeviceProxy(self._deviceProxy))
 
     @property
     def deviceProxy(self) -> ctypes.c_void_p:
@@ -345,7 +350,7 @@ class DeviceProxyWrapper():
 
         localSessionId = ctypes.c_uint16(0)
 
-        builtins.chipStack.Call(
+        chipStack.Call(
             lambda: self._dmLib.pychip_GetLocalSessionId(self._deviceProxy, pointer(localSessionId))
         ).raise_on_error()
 
@@ -358,7 +363,7 @@ class DeviceProxyWrapper():
 
         numSessions = ctypes.c_uint32(0)
 
-        builtins.chipStack.Call(
+        chipStack.Call(
             lambda: self._dmLib.pychip_GetNumSessionsToPeer(self._deviceProxy, pointer(numSessions))
         ).raise_on_error()
 
@@ -373,7 +378,7 @@ class DeviceProxyWrapper():
         size = 64
         buf = ctypes.c_uint8(size)
         csize = ctypes.c_size_t(size)
-        builtins.chipStack.Call(
+        chipStack.Call(
             lambda: self._dmLib.pychip_GetAttestationChallenge(self._deviceProxy, buf, ctypes.byref(csize))
         ).raise_on_error()
 
@@ -388,7 +393,7 @@ class DeviceProxyWrapper():
 
         supportsLargePayload = ctypes.c_bool(False)
 
-        builtins.chipStack.Call(
+        chipStack.Call(
             lambda: self._dmLib.pychip_SessionAllowsLargePayload(self._deviceProxy, pointer(supportsLargePayload))
         ).raise_on_error()
 
@@ -401,7 +406,7 @@ class DeviceProxyWrapper():
 
         isSessionOverTCP = ctypes.c_bool(False)
 
-        builtins.chipStack.Call(
+        chipStack.Call(
             lambda: self._dmLib.pychip_IsSessionOverTCPConnection(self._deviceProxy, pointer(isSessionOverTCP))
         ).raise_on_error()
 
@@ -414,7 +419,7 @@ class DeviceProxyWrapper():
 
         isActiveSession = ctypes.c_bool(False)
 
-        builtins.chipStack.Call(
+        chipStack.Call(
             lambda: self._dmLib.pychip_IsActiveSession(self._deviceProxy, pointer(isActiveSession))
         ).raise_on_error()
 
@@ -424,7 +429,7 @@ class DeviceProxyWrapper():
         self._dmLib.pychip_CloseTCPConnectionWithPeer.argtypes = [ctypes.c_void_p]
         self._dmLib.pychip_CloseTCPConnectionWithPeer.restype = PyChipError
 
-        builtins.chipStack.Call(
+        chipStack.Call(
             lambda: self._dmLib.pychip_CloseTCPConnectionWithPeer(self._deviceProxy)
         ).raise_on_error()
 
@@ -438,7 +443,7 @@ class ChipDeviceControllerBase():
 
     def __init__(self, name: str = ''):
         self.devCtrl = None
-        self._ChipStack = builtins.chipStack
+        self._ChipStack = chipStack
         self._dmLib: typing.Any = None
 
         self._InitLib()
@@ -452,7 +457,7 @@ class ChipDeviceControllerBase():
         self._fabricCheckNodeId = -1
         self._isActive = False
 
-        self._Cluster = ChipClusters(builtins.chipStack)
+        self._Cluster = ChipClusters(chipStack)
         self._Cluster.InitLib(self._dmLib)
         self._commissioning_lock: asyncio.Lock = asyncio.Lock()
         self._commissioning_context: CommissioningContext = CommissioningContext(self, self._commissioning_lock)
