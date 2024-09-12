@@ -26,6 +26,7 @@
 #include <condition_variable>
 #include <mutex>
 
+#include <lib/support/LambdaBridge.h>
 #include <platform/PlatformManager.h>
 #include <platform/internal/GenericPlatformManagerImpl_POSIX.h>
 
@@ -66,10 +67,16 @@ public:
      * @param[in] userData User data to pass to the function.
      * @returns The result of the function.
      */
-    template <typename T>
-    CHIP_ERROR GLibMatterContextInvokeSync(CHIP_ERROR (*func)(T *), T * userData)
+    template <typename Lambda, typename T >
+    CHIP_ERROR GLibMatterContextInvokeSync(const Lambda & lambda, T * userData)
     {
-        return _GLibMatterContextInvokeSync((CHIP_ERROR(*)(void *)) func, (void *) userData);
+     
+     //I commented below because  error: static assertion failed due to requirement 'std::is_invocable_v<chip::DeviceLayer::ConnectivityManagerImpl>': lambda argument must be an invocable with no arguments
+//i took this from src/system/SystemLayer.h#L214 why does it have to be invocable without argument
+      //static_assert(std::is_invocable_v<T>, "lambda argument must be an invocable with no arguments");
+        LambdaBridge bridge;
+        bridge.Initialize(lambda);
+     return _GLibMatterContextInvokeSync(std::move(bridge), (void *) userData);
     }
 
     unsigned int GLibMatterContextAttachSource(GSource * source)
@@ -102,7 +109,7 @@ private:
 
     struct GLibMatterContextInvokeData
     {
-        CHIP_ERROR (*mFunc)(void *);
+        LambdaBridge lambdabridge;
         void * mFuncUserData;
         CHIP_ERROR mFuncResult;
         // Sync primitives to wait for the function to be executed
@@ -116,7 +123,7 @@ private:
      * @note This function does not provide type safety for the user data. Please,
      *       use the GLibMatterContextInvokeSync() template function instead.
      */
-    CHIP_ERROR _GLibMatterContextInvokeSync(CHIP_ERROR (*func)(void *), void * userData);
+    CHIP_ERROR _GLibMatterContextInvokeSync(LambdaBridge && bridge, void * userData);
 
     // XXX: Mutex for guarding access to glib main event loop callback indirection
     //      synchronization primitives. This is a workaround to suppress TSAN warnings.

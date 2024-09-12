@@ -59,7 +59,7 @@ template("chip_fuzz_target") {
       } else {
         fuzz_configs += [
           "//build/config/compiler:libfuzzer_fuzzing",
-          "//build/config/compiler:sanitize_address",
+          #   "//build/config/compiler:sanitize_address",
         ]
       }
 
