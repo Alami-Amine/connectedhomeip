@@ -804,7 +804,7 @@ void ConnectivityManagerImpl::StartWiFiManagement()
     mWpaSupplicant = GDBusWpaSupplicant{};
 
     CHIP_ERROR err = PlatformMgrImpl().GLibMatterContextInvokeSync(
-        +[](ConnectivityManagerImpl * self) { return self->_StartWiFiManagement(); }, this);
+        [this]() { return this->_StartWiFiManagement(); }, this);
     VerifyOrReturn(err == CHIP_NO_ERROR, ChipLogError(DeviceLayer, "Failed to start WiFi management"));
 }
 

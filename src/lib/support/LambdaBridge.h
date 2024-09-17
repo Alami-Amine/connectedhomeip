@@ -36,19 +36,11 @@ public:
         static_assert(CHIP_CONFIG_LAMBDA_EVENT_ALIGN % alignof(Lambda) == 0, "lambda align too large");
 
         // Implicit cast a capture-less lambda into a raw function pointer.
-        mLambdaProxy = [](const LambdaStorage & body) { //(*reinterpret_cast<const Lambda *>(&body))();
-    auto* lambdaPtr = reinterpret_cast<const Lambda*>(&body);
-    (*lambdaPtr)();  // Now call the lambda after casting
-         };
+        mLambdaProxy = [](const LambdaStorage & body) { (*reinterpret_cast<const Lambda *>(&body))(); };
         ::memcpy(&mLambdaBody, &lambda, sizeof(Lambda));
     }
 
     void operator()() const { mLambdaProxy(mLambdaBody); }
-
-    template <typename... Args>
-    void operator()(Args&&... args) const {
-        mLambdaProxy(mLambdaBody, std::forward<Args>(args)...);  // Pass arguments to mLambdaProxy
-    }
 
 private:
     using LambdaStorage = std::aligned_storage_t<CHIP_CONFIG_LAMBDA_EVENT_SIZE, CHIP_CONFIG_LAMBDA_EVENT_ALIGN>;
