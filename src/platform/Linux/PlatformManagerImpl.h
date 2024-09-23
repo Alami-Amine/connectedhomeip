@@ -28,6 +28,7 @@
 
 #include <platform/PlatformManager.h>
 #include <platform/internal/GenericPlatformManagerImpl_POSIX.h>
+#include <lib/support/LambdaBridge.h>
 
 #if CHIP_DEVICE_CONFIG_WITH_GLIB_MAIN_LOOP
 #include <gio/gio.h>
@@ -69,7 +70,11 @@ public:
     template <typename T>
     CHIP_ERROR GLibMatterContextInvokeSync(CHIP_ERROR (*func)(T *), T * userData)
     {
-        return _GLibMatterContextInvokeSync((CHIP_ERROR(*)(void *)) func, (void *) userData);
+        LambdaBridgev2<T> bridge;
+        bridge.Initialize(func, userData);
+
+       return _GLibMatterContextInvokeSyncv2(std::move(bridge));
+       // return _GLibMatterContextInvokeSync((CHIP_ERROR(*)(void *)) func, (void *) userData);
     }
 
     unsigned int GLibMatterContextAttachSource(GSource * source)
