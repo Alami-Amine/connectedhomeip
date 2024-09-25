@@ -70,11 +70,24 @@ public:
     template <typename T>
     CHIP_ERROR GLibMatterContextInvokeSync(CHIP_ERROR (*func)(T *), T * userData)
     {
-        LambdaBridgev2<T> bridge;
-        bridge.Initialize(func, userData);
 
-       return _GLibMatterContextInvokeSyncv2(std::move(bridge));
+        //ori
        // return _GLibMatterContextInvokeSync((CHIP_ERROR(*)(void *)) func, (void *) userData);
+
+
+        //try2
+       // LambdaBridgev2<T> bridge;
+       // bridge.Initialize(func, userData);
+       //return _GLibMatterContextInvokeSyncv2(std::move(bridge));
+
+
+        //try3
+        auto lambda = [func, userData]() -> CHIP_ERROR {
+            return func(userData);
+        };
+        LambdaBridge bridge;
+        bridge.Initialize(lambda);
+       return _GLibMatterContextInvokeSyncv3(std::move(bridge));
     }
 
     unsigned int GLibMatterContextAttachSource(GSource * source)
@@ -115,6 +128,16 @@ private:
         bool mDone = false;
     };
 
+    struct GLibMatterContextInvokeDatav2
+    {
+        LambdaBridge && bridge;
+        CHIP_ERROR mFuncResult;
+        // Sync primitives to wait for the function to be executed
+        std::condition_variable mDoneCond;
+        bool mDone = false;
+    };
+
+
     /**
      * @brief Invoke a function on the Matter GLib context.
      *
@@ -122,6 +145,11 @@ private:
      *       use the GLibMatterContextInvokeSync() template function instead.
      */
     CHIP_ERROR _GLibMatterContextInvokeSync(CHIP_ERROR (*func)(void *), void * userData);
+
+    //CHIP_ERROR _GLibMatterContextInvokeSyncv2(LambdaBridgev2 && bridge);
+
+    CHIP_ERROR _GLibMatterContextInvokeSyncv3(LambdaBridge && bridge);
+
 
     // XXX: Mutex for guarding access to glib main event loop callback indirection
     //      synchronization primitives. This is a workaround to suppress TSAN warnings.
