@@ -310,11 +310,11 @@ CHIP_ERROR PlatformManagerImpl::_GLibMatterContextInvokeSyncv3(LambdaBridge && b
             lock_.unlock();
            // auto result = mFunc(mUserData);
            //auto result was removed because mProxyLambda is returning a void --> to change?
-            data->bridge();
+            auto result = data->bridge.CallLambdaWithErrorReturn();
             lock_.lock();
 
             data->mDone       = true;
-            data->mFuncResult = CHIP_NO_ERROR;
+            data->mFuncResult = result;
             data->mDoneCond.notify_one();
 
             return G_SOURCE_REMOVE;
