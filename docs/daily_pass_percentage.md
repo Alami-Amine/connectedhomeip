@@ -17,6 +17,7 @@
 | build-example-qpg                       |         100 |
 | build-example-nuttx                     |         100 |
 | documentation-build                     |         100 |
+| run-misspell                            |         100 |
 | tests                                   |         100 |
 | build-example-linux-standalone          |         100 |
 | validate-gradle-wrapper                 |         100 |
@@ -30,7 +31,6 @@
 | build-example-asr                       |         100 |
 | qemu                                    |         100 |
 | delete-old-artifacts                    |         100 |
-| issue-labeler                           |         100 |
 | builds                                  |         100 |
 | recent-fail-summary                     |         100 |
 | java-tests                              |         100 |
