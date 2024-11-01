@@ -42,6 +42,10 @@
 #include <transport/raw/MessageHeader.h>
 #include <transport/raw/PeerAddress.h>
 
+namespace Fuzzchip {
+
+class TestPASESession;
+}
 namespace chip {
 
 extern const char kSpake2pI2RSessionInfo[];
@@ -99,8 +103,6 @@ public:
      *                            ownership of the exchangeCtxt to PASESession object. PASESession
      *                            will close the exchange on (successful/failed) handshake completion.
      * @param delegate            Callback object
-     *                            The delegate will be notified if and only if Pair() returns success. Errors occurring after Pair()
-     *                            returns success will be reported via the delegate.
      *
      * @return CHIP_ERROR      The result of initialization
      */
@@ -175,6 +177,7 @@ private:
         kUnexpected             = 0xff,
     };
 
+    friend class Fuzzchip::TestPASESession;
     CHIP_ERROR Init(SessionManager & sessionManager, uint32_t setupCode, SessionEstablishmentDelegate * delegate);
 
     CHIP_ERROR ValidateReceivedMessage(Messaging::ExchangeContext * exchange, const PayloadHeader & payloadHeader,
