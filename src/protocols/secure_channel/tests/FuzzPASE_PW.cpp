@@ -372,7 +372,10 @@ void TestPASESession::FuzzHandlePBKDFParamRequest(System::PacketBufferHandle && 
 
     // This was added because we get a Crash in .mCommissioningHash.AddData if it was called without a Begin
     // TODO: Consider doing a PR for a check inside AddData that an Init(SHA256_Init) did occur (maybe add a flag)
-    pairingAccessory.mCommissioningHash.Begin();
+
+    // NO NEED FOR THIS LINE SINCE ALREADY CALLED IN Init above pairingAccessory.mCommissioningHash.Begin();
+    //  uint8_t Y[10];
+    // pairingAccessory.mCommissioningHash.AddData(ByteSpan(Y));
 
     pairingAccessory.mLocalMRPConfig = MakeOptional(ReliableMessageProtocolConfig(
         System::Clock::Milliseconds32(100), System::Clock::Milliseconds32(200), System::Clock::Milliseconds16(4000)));
@@ -647,7 +650,7 @@ void TestPASESession::FuzzSpake1(const uint32_t fuzzedSetupPasscode, const ByteS
 
     pairingCommissioner.mCommissioningHash.Begin();
     // TODO fuzzedsalt doesnt make sense here, I did it just o  have some data
-    pairingCommissioner.mCommissioningHash.AddData(fuzzedSalt);
+    //  pairingCommissioner.mCommissioningHash.AddData(fuzzedSalt);
 
     CHIP_ERROR err = pairingCommissioner.SetupSpake2p();
     EXPECT_EQ(CHIP_NO_ERROR, err);
@@ -743,6 +746,10 @@ void TestPASESession::FuzzSpake1(const uint32_t fuzzedSetupPasscode, const ByteS
 
     //// WORKAROUND, THE STATE WAS RESET TO "PROVER" --> THIS IS HAPPENING BECAUSE I AM TREATING SENDER AND RECEIVER AS SAME DEVICE
     // THIS IS USUALLY CALLED in `SendPBKDFParamResponse`, I am calling it here since PairingNode is being initialised here
+
+    pairingNode.mCommissioningHash.Begin();
+    // TODO fuzzedsalt doesnt make sense here, I did it just o  have some data
+    pairingNode.mCommissioningHash.AddData(fuzzedSalt);
     err = pairingNode.SetupSpake2p();
 
     // COMPUTE VERIFIER TO BE ABLE TO PASS IT TO BeginVerifier
