@@ -331,18 +331,22 @@ void FuzzCASESession::ParseSigma1(const vector<uint8_t> & InitiatorRandom, uint3
     /*CONSTRUCT SIGMA1*/
     System::PacketBufferHandle msg = GenerateSigma1(InitiatorRandom, fuzzInitiatorSessionId, fuzzedFabricId, IPK, rootPubKey);
 
-    System::PacketBufferTLVReader tlvReader;
+    CASESession::Sigma1Param OutputParseSigma1;
 
+    System::PacketBufferTLVReader tlvReader;
     tlvReader.Init(std::move(msg));
 
-    uint16_t initiatorSessionId;
-    ByteSpan destinationIdentifier;
-    ByteSpan initiatorRandom;
+    // tlvReader.Init(std::move(msg));
 
-    bool sessionResumptionRequested = false;
-    ByteSpan resumptionId;
-    ByteSpan resume1MIC;
-    ByteSpan initiatorPubKey;
+    // uint16_t initiatorSessionId;
+    // ByteSpan destinationIdentifier;
+    // ByteSpan initiatorRandom;
+
+    // bool sessionResumptionRequested = false;
+    // bool InitiatorMRPParamsPresent  = false;
+    // ByteSpan resumptionId;
+    // ByteSpan resume1MIC;
+    // ByteSpan initiatorPubKey;
 
     CASESession pairingAccessory;
 
@@ -353,8 +357,7 @@ void FuzzCASESession::ParseSigma1(const vector<uint8_t> & InitiatorRandom, uint3
     //  ExchangeContext * contextAccessory = NewUnauthenticatedExchangeToBob(&pairingAccessory);
 
     // pairingAccessory.mExchangeCtxt.Emplace(*contextAccessory);
-    pairingAccessory.ParseSigma1(tlvReader, initiatorRandom, initiatorSessionId, destinationIdentifier, initiatorPubKey,
-                                 sessionResumptionRequested, resumptionId, resume1MIC);
+    pairingAccessory.ParseSigma1(tlvReader, OutputParseSigma1);
 }
 
 void ParseSigma1(const vector<uint8_t> & InitiatorRandom, uint32_t fuzzInitiatorSessionId, FabricId fuzzedFabricId,
