@@ -745,7 +745,7 @@ static CHIP_ERROR EncodeSigma1(MutableByteSpan & buf)
                                                                                                                                    \
         TLV::ContiguousBufferTLVReader reader;                                                                                     \
         reader.Init(buf);                                                                                                          \
-        CASESession::Sigma1Param parsedSigma1;                                                                                     \
+        CASESession::ParseSigma1Param parsedSigma1;                                                                                \
         CASESession session;                                                                                                       \
                                                                                                                                    \
         EXPECT_EQ(session.ParseSigma1(reader, parsedSigma1) == CHIP_NO_ERROR, params::expectSuccess);                              \
@@ -871,8 +871,8 @@ struct SessionResumptionTestStorage : SessionResumptionStorage
 {
     SessionResumptionTestStorage(CHIP_ERROR findMethodReturnCode, ScopedNodeId peerNodeId, ResumptionIdStorage * resumptionId,
                                  Crypto::P256ECDHDerivedSecret * sharedSecret) :
-        mFindMethodReturnCode(findMethodReturnCode), mPeerNodeId(peerNodeId), mResumptionId(resumptionId),
-        mSharedSecret(sharedSecret)
+        mFindMethodReturnCode(findMethodReturnCode),
+        mPeerNodeId(peerNodeId), mResumptionId(resumptionId), mSharedSecret(sharedSecret)
     {}
     SessionResumptionTestStorage(CHIP_ERROR findMethodReturnCode) : mFindMethodReturnCode(findMethodReturnCode) {}
     CHIP_ERROR FindByScopedNodeId(const ScopedNodeId & node, ResumptionIdStorage & resumptionId,
