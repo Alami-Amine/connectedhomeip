@@ -172,6 +172,16 @@ public:
     CHIP_ERROR
     ParseSigma1(TLV::ContiguousBufferTLVReader & tlvReader, ParseSigma1Param & OutputParseSigma1);
 
+    enum class Step : uint8_t
+    {
+        kNone,
+        kSendSigma2,
+        kSendSigma2Resume,
+        kSendStatusReport
+    };
+
+    Step mNextStep = Step::kNone;
+
     /**
      * @brief
      *   Derive a secure session from the established session. The API will return error if called before session is established.

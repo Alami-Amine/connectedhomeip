@@ -910,9 +910,58 @@ CHIP_ERROR CASESession::EncodeSigma1(System::PacketBufferHandle & msg, EncodeSig
 CHIP_ERROR CASESession::HandleSigma1_and_SendSigma2(System::PacketBufferHandle && msg)
 {
     MATTER_TRACE_SCOPE("HandleSigma1_and_SendSigma2", "CASESession");
-    ReturnErrorOnFailure(HandleSigma1(std::move(msg)));
 
-    return CHIP_NO_ERROR;
+    CHIP_ERROR err = CHIP_NO_ERROR;
+
+    // 1st OPTION
+    // ReturnErrorOnFailure(HandleSigma1(std::move(msg)));
+
+    // 2nd OPTION
+    // CHIP_ERROR err = HandleSigma1(std::move(msg));
+
+    // 3rd Option
+    // Parse and Validate Received Sigma1
+    SuccessOrExit(err = HandleSigma1(std::move(msg)));
+
+    switch (mNextStep)
+    {
+    case Step::kSendSigma2:
+        //  ReturnErrorOnFailure(EncodeSigma2());
+        // TODO verify MATTER_LOG_METRIC locations
+        MATTER_LOG_METRIC_BEGIN(kMetricDeviceCASESessionSigma2);
+        SuccessOrExitAction(err = SendSigma2(), MATTER_LOG_METRIC_END(kMetricDeviceCASESessionSigma2, err));
+
+        mDelegate->OnSessionEstablishmentStarted();
+        break;
+
+    case Step::kSendSigma2Resume:
+        //  ReturnErrorOnFailure(EncodeSigma2());
+        MATTER_LOG_METRIC_BEGIN(kMetricDeviceCASESessionSigma2Resume);
+        SuccessOrExitAction(err = SendSigma2Resume(), MATTER_LOG_METRIC_END(kMetricDeviceCASESessionSigma2Resume, err));
+
+        mDelegate->OnSessionEstablishmentStarted();
+        break;
+
+        // TODO should I keep this?
+    case Step::kSendStatusReport:
+    default:
+        ExitNow();
+        break;
+    }
+
+exit:
+
+    if (err == CHIP_ERROR_KEY_NOT_FOUND)
+    {
+        SendStatusReport(mExchangeCtxt, kProtocolCodeNoSharedRoot);
+        mState = State::kInitialized;
+    }
+    else if (err != CHIP_NO_ERROR)
+    {
+        SendStatusReport(mExchangeCtxt, kProtocolCodeInvalidParam);
+        mState = State::kInitialized;
+    }
+    return err;
 }
 
 CHIP_ERROR CASESession::FindLocalNodeFromDestinationId(const ByteSpan & destinationId, const ByteSpan & initiatorRandom)
@@ -1005,16 +1054,16 @@ CHIP_ERROR CASESession::HandleSigma1(System::PacketBufferHandle && msg)
 
     ParseSigma1Param parsedSigma1;
 
-    SuccessOrExit(err = mCommissioningHash.AddData(ByteSpan{ msg->Start(), msg->DataLength() }));
+    ReturnErrorOnFailure(mCommissioningHash.AddData(ByteSpan{ msg->Start(), msg->DataLength() }));
 
     tlvReader.Init(std::move(msg));
 
-    SuccessOrExit(err = ParseSigma1(tlvReader, parsedSigma1));
+    ReturnErrorOnFailure(ParseSigma1(tlvReader, parsedSigma1));
 
     ChipLogDetail(SecureChannel, "Peer assigned session key ID %d", parsedSigma1.initiatorSessionId);
     SetPeerSessionId(parsedSigma1.initiatorSessionId);
 
-    VerifyOrExit(mFabricsTable != nullptr, err = CHIP_ERROR_INCORRECT_STATE);
+    VerifyOrReturnError(mFabricsTable != nullptr, CHIP_ERROR_INCORRECT_STATE);
 
     // Set the MRP parameters provided in the Sigma1 message
     if (parsedSigma1.InitiatorMRPParamsPresent)
@@ -1033,17 +1082,12 @@ CHIP_ERROR CASESession::HandleSigma1(System::PacketBufferHandle && msg)
         std::copy(parsedSigma1.resumptionId.begin(), parsedSigma1.resumptionId.end(), mResumeResumptionId.begin());
 
         // Send Sigma2Resume message to the initiator
-        MATTER_LOG_METRIC_BEGIN(kMetricDeviceCASESessionSigma2Resume);
-        err = SendSigma2Resume();
-        if (CHIP_NO_ERROR != err)
-        {
-            MATTER_LOG_METRIC_END(kMetricDeviceCASESessionSigma2Resume, err);
-        }
-        SuccessOrExit(err);
+        mNextStep = Step::kSendSigma2Resume;
+        // TODO
+        // err       = SendSigma2Resume();
 
-        mDelegate->OnSessionEstablishmentStarted();
-
-        // Early returning here, since we have sent Sigma2Resume, and no further processing is needed for the Sigma1 message
+        // TODO keep it as CHIP NO ERRORN?
+        //  Early returning here, since we have sent Sigma2Resume, and no further processing is needed for the Sigma1 message
         return CHIP_NO_ERROR;
     }
 
@@ -1056,41 +1100,55 @@ CHIP_ERROR CASESession::HandleSigma1(System::PacketBufferHandle && msg)
 
         // Side-effect of FindLocalNodeFromDestinationId success was that mFabricIndex/mLocalNodeId are now
         // set to the local fabric and associated NodeId that was targeted by the initiator.
+
+        // TODO I moved this here, because it should only be called when SendSigma2()
+        //  ParseSigma1 ensures that:
+        //  mRemotePubKey.Length() == initiatorPubKey.size() == kP256_PublicKey_Length.
+        memcpy(mRemotePubKey.Bytes(), parsedSigma1.initiatorEphPubKey.data(), mRemotePubKey.Length());
+
+        mNextStep = Step::kSendSigma2;
     }
     else
     {
         ChipLogError(SecureChannel, "CASE failed to match destination ID with local fabrics");
         ChipLogByteSpan(SecureChannel, parsedSigma1.destinationId);
+
+        // TODO  FindLocalNodeFromDestinationId returns CHIP_ERROR_KEY_NOT_FOUND if failed
+        mNextStep = Step::kSendStatusReport;
+
+        // TODO I added a return here
+        // TODO: does returning CHIP_NO_ERROR here make sense? or should I just make it return
+        return err;
     }
-    SuccessOrExit(err);
 
-    // ParseSigma1 ensures that:
-    // mRemotePubKey.Length() == initiatorPubKey.size() == kP256_PublicKey_Length.
-    memcpy(mRemotePubKey.Bytes(), parsedSigma1.initiatorEphPubKey.data(), mRemotePubKey.Length());
+    //   SuccessOrExit(err);
 
-    MATTER_LOG_METRIC_BEGIN(kMetricDeviceCASESessionSigma2);
-    err = SendSigma2();
-    if (CHIP_NO_ERROR != err)
-    {
-        MATTER_LOG_METRIC_END(kMetricDeviceCASESessionSigma2, err);
-    }
-    SuccessOrExit(err);
+    // MATTER_LOG_METRIC_BEGIN(kMetricDeviceCASESessionSigma2);
+    //  TODO
+    //  err = SendSigma2();
+    //  if (CHIP_NO_ERROR != err)
+    //  {
+    //      MATTER_LOG_METRIC_END(kMetricDeviceCASESessionSigma2, err);
+    //  }
+    //  SuccessOrExit(err);
 
-    mDelegate->OnSessionEstablishmentStarted();
+    // mDelegate->OnSessionEstablishmentStarted();
 
-exit:
+    // exit:
 
-    if (err == CHIP_ERROR_KEY_NOT_FOUND)
-    {
-        SendStatusReport(mExchangeCtxt, kProtocolCodeNoSharedRoot);
-        mState = State::kInitialized;
-    }
-    else if (err != CHIP_NO_ERROR)
-    {
-        SendStatusReport(mExchangeCtxt, kProtocolCodeInvalidParam);
-        mState = State::kInitialized;
-    }
-    return err;
+    // if (err == CHIP_ERROR_KEY_NOT_FOUND)
+    // {
+    //     SendStatusReport(mExchangeCtxt, kProtocolCodeNoSharedRoot);
+    //     mState = State::kInitialized;
+    // }
+    // else if (err != CHIP_NO_ERROR)
+    // {
+    //     SendStatusReport(mExchangeCtxt, kProtocolCodeInvalidParam);
+    //     mState = State::kInitialized;
+    // }
+    //    return err;
+
+    return CHIP_NO_ERROR;
 }
 
 CHIP_ERROR CASESession::SendSigma2Resume()
