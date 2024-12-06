@@ -182,6 +182,17 @@ public:
 
     Step mNextStep = Step::kNone;
 
+    struct EncodeSigma2Param
+    {
+        uint8_t msg_rand[kSigmaParamRandomNumberSize];
+        uint16_t responderSessionId;
+        const Crypto::P256PublicKey * pEphPubKey;
+        Platform::ScopedMemoryBuffer<uint8_t> msg_R2_Encrypted;
+        size_t encrypted2Length;
+        const ReliableMessageProtocolConfig * responderMrpConfig;
+    };
+    CHIP_ERROR EncodeSigma2(System::PacketBufferHandle & msg, EncodeSigma2Param & inputParams);
+
     /**
      * @brief
      *   Derive a secure session from the established session. The API will return error if called before session is established.
@@ -283,7 +294,9 @@ private:
     CHIP_ERROR HandleSigma1(System::PacketBufferHandle && msg);
     CHIP_ERROR TryResumeSession(SessionResumptionStorage::ConstResumptionIdView resumptionId, ByteSpan resume1MIC,
                                 ByteSpan initiatorRandom);
-    CHIP_ERROR SendSigma2();
+    CHIP_ERROR PrepareSigma2(EncodeSigma2Param & output);
+
+    CHIP_ERROR SendSigma2(System::PacketBufferHandle & msg_R2);
     CHIP_ERROR HandleSigma2_and_SendSigma3(System::PacketBufferHandle && msg);
     CHIP_ERROR HandleSigma2(System::PacketBufferHandle && msg);
     CHIP_ERROR HandleSigma2Resume(System::PacketBufferHandle && msg);
