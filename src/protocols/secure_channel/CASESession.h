@@ -197,8 +197,7 @@ public:
     {
         ByteSpan resumptionId;
         uint8_t sigma2ResumeMIC[Crypto::CHIP_CRYPTO_AEAD_MIC_LENGTH_BYTES];
-        // TODO maybe remove this bytespan, or remove the array above it
-        ByteSpan resumeMICSpan;
+        MutableByteSpan resumeMICSpan{ sigma2ResumeMIC };
         uint16_t responderSessionId;
         const ReliableMessageProtocolConfig * responderMrpConfig;
     };
