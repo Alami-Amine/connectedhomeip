@@ -193,6 +193,18 @@ public:
     };
     CHIP_ERROR EncodeSigma2(System::PacketBufferHandle & msg, EncodeSigma2Param & inputParams);
 
+    struct EncodeSigma2ResParam
+    {
+        ByteSpan resumptionId;
+        uint8_t sigma2ResumeMIC[Crypto::CHIP_CRYPTO_AEAD_MIC_LENGTH_BYTES];
+        // TODO maybe remove this bytespan, or remove the array above it
+        ByteSpan resumeMICSpan;
+        uint16_t responderSessionId;
+        const ReliableMessageProtocolConfig * responderMrpConfig;
+    };
+
+    CHIP_ERROR EncodeSigma2Resume(System::PacketBufferHandle & msg, EncodeSigma2ResParam & inputParams);
+
     /**
      * @brief
      *   Derive a secure session from the established session. The API will return error if called before session is established.
@@ -294,9 +306,12 @@ private:
     CHIP_ERROR HandleSigma1(System::PacketBufferHandle && msg);
     CHIP_ERROR TryResumeSession(SessionResumptionStorage::ConstResumptionIdView resumptionId, ByteSpan resume1MIC,
                                 ByteSpan initiatorRandom);
-    CHIP_ERROR PrepareSigma2(EncodeSigma2Param & output);
 
+    CHIP_ERROR PrepareSigma2(EncodeSigma2Param & output);
+    CHIP_ERROR PrepareSigma2Resume(EncodeSigma2ResParam & output);
     CHIP_ERROR SendSigma2(System::PacketBufferHandle & msg_R2);
+    CHIP_ERROR SendSigma2Resume(System::PacketBufferHandle & msg_R2_resume);
+
     CHIP_ERROR HandleSigma2_and_SendSigma3(System::PacketBufferHandle && msg);
     CHIP_ERROR HandleSigma2(System::PacketBufferHandle && msg);
     CHIP_ERROR HandleSigma2Resume(System::PacketBufferHandle && msg);
