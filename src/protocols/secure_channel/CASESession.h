@@ -146,10 +146,17 @@ public:
         bool InitiatorMRPParamsPresent = false;
     };
 
-    /*
-     * TLV Encodes a Sigma1 message into the payload handled by msg
-     */
-    CHIP_ERROR EncodeSigma1(System::PacketBufferHandle & msg, EncodeSigma1Param & InputEncodeSigma1);
+    /**
+     * @brief  Encodes a Sigma1 message into TLV format and allocates a buffer for it within the provided PacketBufferHandle.
+     *
+     * @param outmsg     PacketBufferHandle passed by reference. The handle must be empty prior to calling this method,
+     *              as a new buffer will be allocated and assigned to it within the method.
+     *
+     * @param input a struct containing all the values that will be encoded into TLV format
+     *
+     * @note the passed PacketBufferHandle `outmsg` must be in a null state.
+     **/
+    CHIP_ERROR EncodeSigma1(System::PacketBufferHandle & outmsg, EncodeSigma1Param & inparam);
 
     /**
      * Parse a sigma1 message.  This function will return success only if the
@@ -161,16 +168,13 @@ public:
      *   * Either resumptionID and initiatorResume1MIC are both present or both
      *     absent.
      *
-     * On success, the initiatorRandom, initiatorSessionId, destinationId,
-     * initiatorEphPubKey outparams will be set to the corresponding values in
-     * the message.
+     * On success, the members of outparam will be set to the values corresponding to the message.
      *
      * On success, either the resumptionRequested outparam will be set to true
-     * and the  resumptionID and initiatorResumeMIC outparams will be set to
+     * and the resumptionID and initiatorResumeMIC outparams will be set to
      * valid values, or the resumptionRequested outparam will be set to false.
      */
-    CHIP_ERROR
-    ParseSigma1(TLV::ContiguousBufferTLVReader & tlvReader, ParseSigma1Param & OutputParseSigma1);
+    CHIP_ERROR ParseSigma1(TLV::ContiguousBufferTLVReader & tlvReader, ParseSigma1Param & outparam);
 
     enum class Step : uint8_t
     {
@@ -184,7 +188,7 @@ public:
 
     struct EncodeSigma2Param
     {
-        uint8_t msg_rand[kSigmaParamRandomNumberSize];
+        uint8_t responderRandom[kSigmaParamRandomNumberSize];
         uint16_t responderSessionId;
         const Crypto::P256PublicKey * pEphPubKey;
         Platform::ScopedMemoryBuffer<uint8_t> msg_R2_Encrypted;

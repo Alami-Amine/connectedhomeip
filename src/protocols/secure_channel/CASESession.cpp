@@ -67,7 +67,7 @@ enum
     kTag_TBSData_ReceiverPubKey = 4,
 };
 
-// Sigma1
+// Sigma1 TLV Tags
 inline constexpr uint8_t kInitiatorRandomTag    = 1;
 inline constexpr uint8_t kInitiatorSessionIdTag = 2;
 inline constexpr uint8_t kDestinationIdTag      = 3;
@@ -76,7 +76,8 @@ inline constexpr uint8_t kInitiatorMRPParamsTag = 5;
 inline constexpr uint8_t kResumptionIDTag       = 6;
 inline constexpr uint8_t kResume1MICTag         = 7;
 
-// Sigma2
+// Sigma2 TLV Tags
+// TODO: either use constexpr, or enum for all
 enum
 {
     kTag_Sigma2_ResponderRandom    = 1,
@@ -86,7 +87,7 @@ enum
     kTag_Sigma2_ResponderMRPParams = 5,
 };
 
-// Sigma2
+// Sigma2Resume TLV Tags
 enum
 {
     kTag_Sigma2Res_ResumptionID       = 1,
@@ -887,6 +888,9 @@ CHIP_ERROR CASESession::EncodeSigma1(System::PacketBufferHandle & msg, EncodeSig
                                                   CHIP_CRYPTO_AEAD_MIC_LENGTH_BYTES            // initiatorResumeMIC
     );
 
+    // the PacketBufferHandler should be empty
+    VerifyOrReturnError(msg.IsNull(), CHIP_ERROR_INCORRECT_STATE);
+
     msg = System::PacketBufferHandle::New(data_len);
     VerifyOrReturnError(!msg.IsNull(), CHIP_ERROR_NO_MEMORY);
 
@@ -1228,7 +1232,7 @@ CHIP_ERROR CASESession::PrepareSigma2(EncodeSigma2Param & output)
     ReturnErrorOnFailure(mFabricsTable->FetchNOCCert(mFabricIndex, nocCert));
 
     // Fill in the random value
-    ReturnErrorOnFailure(DRBG_get_bytes(&output.msg_rand[0], sizeof(output.msg_rand)));
+    ReturnErrorOnFailure(DRBG_get_bytes(&output.responderRandom[0], sizeof(output.responderRandom)));
 
     // Generate an ephemeral keypair
     mEphemeralKey = mFabricsTable->AllocateEphemeralKeypairForCASE();
@@ -1242,7 +1246,7 @@ CHIP_ERROR CASESession::PrepareSigma2(EncodeSigma2Param & output)
     uint8_t msg_salt[kIPKSize + kSigmaParamRandomNumberSize + kP256_PublicKey_Length + kSHA256_Hash_Length];
 
     MutableByteSpan saltSpan(msg_salt);
-    ReturnErrorOnFailure(ConstructSaltSigma2(ByteSpan(output.msg_rand), mEphemeralKey->Pubkey(), ByteSpan(mIPK), saltSpan));
+    ReturnErrorOnFailure(ConstructSaltSigma2(ByteSpan(output.responderRandom), mEphemeralKey->Pubkey(), ByteSpan(mIPK), saltSpan));
 
     AutoReleaseSessionKey sr2k(*mSessionManager->GetSessionKeystore());
     ReturnErrorOnFailure(DeriveSigmaKey(saltSpan, ByteSpan(kKDFSR2Info), sr2k));
@@ -1337,8 +1341,8 @@ CHIP_ERROR CASESession::EncodeSigma2(System::PacketBufferHandle & msg_R2, Encode
     tlvWriterMsg2.Init(std::move(msg_R2));
     ReturnErrorOnFailure(tlvWriterMsg2.StartContainer(TLV::AnonymousTag(), TLV::kTLVType_Structure, outerContainerType));
 
-    ReturnErrorOnFailure(
-        tlvWriterMsg2.PutBytes(TLV::ContextTag(kTag_Sigma2_ResponderRandom), &input.msg_rand[0], sizeof(input.msg_rand)));
+    ReturnErrorOnFailure(tlvWriterMsg2.PutBytes(TLV::ContextTag(kTag_Sigma2_ResponderRandom), &input.responderRandom[0],
+                                                sizeof(input.responderRandom)));
     ReturnErrorOnFailure(tlvWriterMsg2.Put(TLV::ContextTag(kTag_Sigma2_ResponderSessionId), input.responderSessionId));
     ReturnErrorOnFailure(tlvWriterMsg2.PutBytes(TLV::ContextTag(kTag_Sigma2_ResponderEphPubKey), *input.pEphPubKey,
                                                 static_cast<uint32_t>(input.pEphPubKey->Length())));
