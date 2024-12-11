@@ -152,7 +152,7 @@ public:
      * @param outmsg     PacketBufferHandle passed by reference. The handle must be empty prior to calling this method,
      *              as a new buffer will be allocated and assigned to it within the method.
      *
-     * @param input a struct containing all the values that will be encoded into TLV format
+     * @param inparam a struct containing all the values that will be encoded into TLV format
      *
      * @note the passed PacketBufferHandle `outmsg` must be in a null state.
      **/
@@ -170,9 +170,9 @@ public:
      *
      * On success, the members of outparam will be set to the values corresponding to the message.
      *
-     * On success, either the resumptionRequested outparam will be set to true
-     * and the resumptionID and initiatorResumeMIC outparams will be set to
-     * valid values, or the resumptionRequested outparam will be set to false.
+     * On success, either the sessionResumptionRequested outparam will be set to true
+     * and the resumptionID and initiatorResumeMICSpan outparams will be set to
+     * valid values, or the sessionResumptionRequested outparam will be set to false.
      */
     CHIP_ERROR ParseSigma1(TLV::ContiguousBufferTLVReader & tlvReader, ParseSigma1Param & outparam);
 
@@ -195,7 +195,6 @@ public:
         size_t encrypted2Length;
         const ReliableMessageProtocolConfig * responderMrpConfig;
     };
-    CHIP_ERROR EncodeSigma2(System::PacketBufferHandle & msg, EncodeSigma2Param & inputParams);
 
     struct EncodeSigma2ResParam
     {
@@ -206,7 +205,30 @@ public:
         const ReliableMessageProtocolConfig * responderMrpConfig;
     };
 
-    CHIP_ERROR EncodeSigma2Resume(System::PacketBufferHandle & msg, EncodeSigma2ResParam & inputParams);
+    /**
+     * @brief  Encodes a Sigma2 message into TLV format and allocates a buffer for it within the provided PacketBufferHandle.
+     *
+     * @param outmsg     PacketBufferHandle passed by reference. The handle must be empty prior to calling this method,
+     *              as a new buffer will be allocated and assigned to it within the method.
+     *
+     * @param inparam a struct containing all the values that will be encoded into TLV format
+     *
+     * @note the passed PacketBufferHandle `outmsg` must be in a null state.
+     **/
+
+    CHIP_ERROR EncodeSigma2(System::PacketBufferHandle & outmsg, EncodeSigma2Param & inparam);
+
+    /**
+     * @brief  Encodes a Sigma2_Resume message into TLV format and allocates a buffer for it within the provided PacketBufferHandle.
+     *
+     * @param outmsg     PacketBufferHandle passed by reference. The handle must be empty prior to calling this method,
+     *              as a new buffer will be allocated and assigned to it within the method.
+     *
+     * @param inparam a struct containing all the values that will be encoded into TLV format
+     *
+     * @note the passed PacketBufferHandle `outmsg` must be in a null state.
+     **/
+    CHIP_ERROR EncodeSigma2Resume(System::PacketBufferHandle & outmsg, EncodeSigma2ResParam & inparam);
 
     /**
      * @brief

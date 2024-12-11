@@ -1332,6 +1332,9 @@ CHIP_ERROR CASESession::EncodeSigma2(System::PacketBufferHandle & msg_R2, Encode
                                                   SessionParameters::kEstimatedTLVSize // responderSessionParams
     );
 
+    // the PacketBufferHandler should be empty
+    VerifyOrReturnError(msg_R2.IsNull(), CHIP_ERROR_INCORRECT_STATE);
+
     msg_R2 = System::PacketBufferHandle::New(data_len);
     VerifyOrReturnError(!msg_R2.IsNull(), CHIP_ERROR_NO_MEMORY);
 
@@ -1344,8 +1347,15 @@ CHIP_ERROR CASESession::EncodeSigma2(System::PacketBufferHandle & msg_R2, Encode
     ReturnErrorOnFailure(tlvWriterMsg2.PutBytes(TLV::ContextTag(kTag_Sigma2_ResponderRandom), &input.responderRandom[0],
                                                 sizeof(input.responderRandom)));
     ReturnErrorOnFailure(tlvWriterMsg2.Put(TLV::ContextTag(kTag_Sigma2_ResponderSessionId), input.responderSessionId));
+
+    VerifyOrReturnError(input.pEphPubKey != nullptr, CHIP_ERROR_INCORRECT_STATE);
+
     ReturnErrorOnFailure(tlvWriterMsg2.PutBytes(TLV::ContextTag(kTag_Sigma2_ResponderEphPubKey), *input.pEphPubKey,
                                                 static_cast<uint32_t>(input.pEphPubKey->Length())));
+
+    // Check if msg_R2_Encrypted is not nullptr
+    VerifyOrReturnError(input.msg_R2_Encrypted, CHIP_ERROR_INCORRECT_STATE);
+
     ReturnErrorOnFailure(tlvWriterMsg2.PutBytes(TLV::ContextTag(kTag_Sigma2_Encrypted2), input.msg_R2_Encrypted.Get(),
                                                 static_cast<uint32_t>(input.encrypted2Length)));
 

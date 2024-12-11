@@ -873,10 +873,11 @@ TEST_F(TestCASESession, EncodeSigma1Test)
     CASESession session;
     CASESession::EncodeSigma1Param encodeParams;
 
-    uint8_t random[32]              = { 0x07, 0x03, 0x01 };
+    uint8_t random[32];
+    EXPECT_EQ(chip::Crypto::DRBG_get_bytes(&random[0], 32), CHIP_NO_ERROR);
     encodeParams.initiatorRandom    = ByteSpan(random, sizeof(random));
     encodeParams.initiatorSessionId = 7315;
-    uint8_t destinationId[32]       = { 0xCA, 0xFE };
+    uint8_t destinationId[32]       = { 0xDE, 0xAD };
     encodeParams.destinationId      = ByteSpan(destinationId, sizeof(destinationId));
 
     ReliableMessageProtocolConfig MRPConfig = GetDefaultMRPConfig();
@@ -975,202 +976,64 @@ TEST_F(TestCASESession, EncodeSigma1Test)
     gDeviceOperationalKeystore.ReleaseEphemeralKeypair(EphemeralKey);
 }
 
-/********************************************* */
-// Forward declarations
-template <typename StructType>
-void PopulateEncodeSigma1Params(CASESession::EncodeSigma1Param & params);
-
-template <typename StructType>
-void TestSigma1Roundtrip();
-
-// Implementation of PopulateEncodeSigma1Params
-template <typename StructType>
-void PopulateEncodeSigma1Params(CASESession::EncodeSigma1Param & params)
+TEST_F(TestCASESession, EncodeSigma2Test)
 {
-    static uint8_t random[StructType::initiatorRandomLen] = { 0x01, 0x02, 0x03 };
-    params.initiatorRandom                                = ByteSpan(random, StructType::initiatorRandomLen);
+    System::PacketBufferHandle msg;
+    CASESession session;
+    CASESession::EncodeSigma2Param encodeParams;
 
-    params.initiatorSessionId = static_cast<uint16_t>(StructType::initiatorSessionId);
+    EXPECT_EQ(chip::Crypto::DRBG_get_bytes(&encodeParams.responderRandom[0], sizeof(encodeParams.responderRandom)), CHIP_NO_ERROR);
+    encodeParams.responderSessionId = 7315;
 
-    static uint8_t destinationId[StructType::destinationIdLen] = { 0xAA, 0xBB };
-    params.destinationId                                       = ByteSpan(destinationId, StructType::destinationIdLen);
-
-    if (StructType::resumptionIdLen > 0)
-    {
-        static uint8_t resumptionId[StructType::resumptionIdLen];
-        resumptionId[0]     = 0x10;
-        resumptionId[1]     = 0x20;
-        params.resumptionId = ByteSpan(resumptionId, StructType::resumptionIdLen);
-    }
-
-    if (StructType::initiatorResumeMICLen > 0)
-    {
-        static uint8_t resumeMIC[StructType::initiatorResumeMICLen];
-        resumeMIC[0] = 0x30;
-        resumeMIC[1] = 0x40;
-        MutableByteSpan micSpan(resumeMIC, StructType::initiatorResumeMICLen);
-        params.initiatorResumeMICSpan = micSpan;
-    }
-
-    params.sessionResumptionRequested = (StructType::resumptionIdLen != 0 && StructType::initiatorResumeMICLen != 0);
-}
-
-// Implementation of TestSigma1Roundtrip
-template <typename StructType>
-void TestSigma1Roundtrip()
-{
-    CASESession::EncodeSigma1Param encodeParams;
-
-    PopulateEncodeSigma1Params<StructType>(encodeParams);
-
-    // TODO public key only works for an exact 65 member array, so this is useless, maybe remove the Sigma1PubKey calls
+    // Generate Ephemeral Public Key
     Crypto::P256Keypair * EphemeralKey = gDeviceOperationalKeystore.AllocateEphemeralKeypairForCASE();
     ASSERT_NE(EphemeralKey, nullptr);
     EXPECT_EQ(CHIP_NO_ERROR, EphemeralKey->Initialize(ECPKeyTarget::ECDH));
     encodeParams.pEphPubKey = &EphemeralKey->Pubkey();
 
-    // TODO MRP are not being used
+    // TBEData2Encrypted
+    encodeParams.msg_R2_Encrypted.Alloc(100);
+
+    // responder Session Parameters
     ReliableMessageProtocolConfig MRPConfig = GetDefaultMRPConfig();
+    encodeParams.responderMrpConfig         = &MRPConfig;
 
-    encodeParams.initiatorMrpConfig = &MRPConfig;
+    EXPECT_EQ(CHIP_NO_ERROR, session.EncodeSigma2(msg, encodeParams));
 
-    CASESession session;
-    System::PacketBufferHandle msg;
-
-    CHIP_ERROR encodeError = session.EncodeSigma1(msg, encodeParams);
-
-    // if (!StructType::expectSuccess)
-    // {
-    //     EXPECT_NE(encodeError, CHIP_NO_ERROR);
-    //     return;
-    // }
-
-    EXPECT_EQ(encodeError, CHIP_NO_ERROR);
-
-    System::PacketBufferTLVReader tlvReader;
-    tlvReader.Init(std::move(msg));
-    CASESession::ParseSigma1Param parsedParams;
-
-    CHIP_ERROR parseError = session.ParseSigma1(tlvReader, parsedParams);
-    EXPECT_EQ(parseError == CHIP_NO_ERROR, StructType::expectSuccess);
-
-    if (StructType::expectSuccess)
     {
-        EXPECT_EQ(parsedParams.sessionResumptionRequested,
-                  StructType::resumptionIdLen != 0 && StructType::initiatorResumeMICLen != 0);
+        System::PacketBufferHandle nonEmptyMsg = System::PacketBufferHandle::New(100);
 
-        // Round-trip validation: ensure encoded input matches decoded output
-        EXPECT_TRUE(parsedParams.initiatorRandom.data_equal(encodeParams.initiatorRandom));
-        EXPECT_EQ(parsedParams.initiatorSessionId, encodeParams.initiatorSessionId);
-        EXPECT_TRUE(parsedParams.destinationId.data_equal(encodeParams.destinationId));
-
-        if (StructType::resumptionIdLen > 0)
-        {
-            EXPECT_TRUE(parsedParams.resumptionId.data_equal(encodeParams.resumptionId));
-        }
-
-        if (StructType::initiatorResumeMICLen > 0)
-        {
-            EXPECT_TRUE(parsedParams.initiatorResumeMICSpan.data_equal(encodeParams.initiatorResumeMICSpan));
-        }
+        // EncodeSigma2 should fail when the packetBufferHandle passed to it is not empty
+        EXPECT_EQ(CHIP_ERROR_INCORRECT_STATE, session.EncodeSigma2(nonEmptyMsg, encodeParams));
     }
 
-    // Release EphemeralKeyPair
-    gDeviceOperationalKeystore.ReleaseEphemeralKeypair(EphemeralKey);
-}
-TEST_F(TestCASESession, Sigma1RoundtripTest)
-{
-    //  constexpr size_t bufferSize = 1280;
-    //   chip::Platform::ScopedMemoryBuffer<uint8_t> mem;
-    //   EXPECT_TRUE(mem.Calloc(bufferSize));
+    // EncodeSigma1 should fail when there is no public key
+    encodeParams.pEphPubKey = nullptr;
+    EXPECT_EQ(CHIP_ERROR_INCORRECT_STATE, session.EncodeSigma2(msg, encodeParams));
+    msg = nullptr;
 
-    // Run tests with all provided structs
-    TestSigma1Roundtrip<Sigma1Params>();
-    TestSigma1Roundtrip<Sigma1NoStructEnd>();
-    TestSigma1Roundtrip<Sigma1WrongTags>();
-    TestSigma1Roundtrip<Sigma1TooLongRandom>();
-    TestSigma1Roundtrip<Sigma1TooShortRandom>();
-    TestSigma1Roundtrip<Sigma1TooLongDest>();
-    TestSigma1Roundtrip<Sigma1TooShortDest>();
-    TestSigma1Roundtrip<Sigma1TooLongPubkey>();
-    TestSigma1Roundtrip<Sigma1TooShortPubkey>();
-    TestSigma1Roundtrip<Sigma1WithResumption>();
-    TestSigma1Roundtrip<Sigma1TooLongResumptionId>();
-    TestSigma1Roundtrip<Sigma1TooShortResumptionId>();
-    TestSigma1Roundtrip<Sigma1TooLongResumeMIC>();
-    TestSigma1Roundtrip<Sigma1TooShortResumeMIC>();
-    TestSigma1Roundtrip<Sigma1SessionIdMax>();
-    TestSigma1Roundtrip<Sigma1SessionIdTooBig>();
-    // TODO, the Struct is uint16_t, doesnt make sense to test the below one
-    // TestSigma1Roundtrip<Sigma1SessionIdTooBig>();
-}
-
-/********* */
-#define TestSigma1EncodeRoundTrip(mem, bufferSize, params)                                                                         \
-    do                                                                                                                             \
-    {                                                                                                                              \
-        System::PacketBufferHandle msg;                                                                                            \
-        System::PacketBufferTLVReader tlvReader;                                                                                   \
-        tlvReader.Init(std::move(msg));                                                                                            \
-                                                                                                                                   \
-        CASESession::ParseSigma1Param parsedSigma1;                                                                                \
-        CASESession session;                                                                                                       \
-                                                                                                                                   \
-        EXPECT_EQ(session.EncodeSigma1(msg, encodeParams));                                                                        \
-                                                                                                                                   \
-        EXPECT_EQ(session.ParseSigma1(reader, parsedSigma1) == CHIP_NO_ERROR, params::expectSuccess);                              \
-        if (params::expectSuccess)                                                                                                 \
-        {                                                                                                                          \
-            EXPECT_EQ(parsedSigma1.sessionResumptionRequested,                                                                     \
-                      params::resumptionIdLen != 0 && params::initiatorResumeMICLen != 0);                                         \
-            /* Add other verification tests here as desired */                                                                     \
-        }                                                                                                                          \
-    } while (0)
-
-void DoRoundTripTest(CASESession::EncodeSigma1Param & encodeParams)
-{
-
-    System::PacketBufferHandle msg;
-    CASESession session;
-
-    CASESession::ParseSigma1Param parseParams;
-
-    // Encode Sigma1 in TLV Format
-    session.EncodeSigma1(msg, encodeParams);
-
-    System::PacketBufferTLVReader tlvReader;
-    tlvReader.Init(std::move(msg));
-
-    // Parse the TLV-Encoded Sigma1
-    session.ParseSigma1(tlvReader, parseParams);
-
-    // RoundTrip
-    EXPECT_TRUE(parseParams.initiatorRandom.data_equal(encodeParams.initiatorRandom));
-    EXPECT_EQ(parseParams.initiatorSessionId, encodeParams.initiatorSessionId);
-    EXPECT_TRUE(parseParams.destinationId.data_equal(encodeParams.destinationId));
-    EXPECT_TRUE(parseParams.initiatorEphPubKey.data_equal(
-        ByteSpan(encodeParams.pEphPubKey->ConstBytes(), encodeParams.pEphPubKey->Length())));
-}
-TEST_F(TestCASESession, Sigma1EncodingRoundTripTest)
-{
-    CASESession::EncodeSigma1Param encodeParams;
-
-    uint8_t random[32]              = { 0x01, 0x02, 0x03 };
-    encodeParams.initiatorRandom    = ByteSpan(random, sizeof(random));
-    encodeParams.initiatorSessionId = 12345;
-    uint8_t destinationId[32]       = { 0xAA, 0xBB };
-    encodeParams.destinationId      = ByteSpan(destinationId, sizeof(destinationId));
-
-    Crypto::P256Keypair * EphemeralKey = gDeviceOperationalKeystore.AllocateEphemeralKeypairForCASE();
-    ASSERT_NE(EphemeralKey, nullptr);
-    EXPECT_EQ(CHIP_NO_ERROR, EphemeralKey->Initialize(ECPKeyTarget::ECDH));
     encodeParams.pEphPubKey = &EphemeralKey->Pubkey();
+    EXPECT_EQ(CHIP_NO_ERROR, session.EncodeSigma2(msg, encodeParams));
+    msg = nullptr;
 
-    ReliableMessageProtocolConfig MRPConfig = GetDefaultMRPConfig();
+    // EncodeSigma1 should fail when TBEData2Encrypted is not allocated
+    encodeParams.msg_R2_Encrypted.Free();
 
-    encodeParams.initiatorMrpConfig = &MRPConfig;
+    EXPECT_EQ(CHIP_ERROR_INCORRECT_STATE, session.EncodeSigma2(msg, encodeParams));
+    msg = nullptr;
 
-    DoRoundTripTest(encodeParams);
+    encodeParams.msg_R2_Encrypted.Alloc(100);
+
+    EXPECT_EQ(CHIP_NO_ERROR, session.EncodeSigma2(msg, encodeParams));
+
+    // EncodeSigma1 should fail when MRP config is missing
+    encodeParams.responderMrpConfig = nullptr;
+    EXPECT_EQ(CHIP_ERROR_INCORRECT_STATE, session.EncodeSigma2(msg, encodeParams));
+    msg = nullptr;
+
+    // Succeed when MRP Config is provided
+    encodeParams.responderMrpConfig = &MRPConfig;
+    EXPECT_EQ(CHIP_NO_ERROR, session.EncodeSigma2(msg, encodeParams));
 
     // Release EphemeralKeyPair
     gDeviceOperationalKeystore.ReleaseEphemeralKeypair(EphemeralKey);
@@ -1180,8 +1043,8 @@ struct SessionResumptionTestStorage : SessionResumptionStorage
 {
     SessionResumptionTestStorage(CHIP_ERROR findMethodReturnCode, ScopedNodeId peerNodeId, ResumptionIdStorage * resumptionId,
                                  Crypto::P256ECDHDerivedSecret * sharedSecret) :
-        mFindMethodReturnCode(findMethodReturnCode), mPeerNodeId(peerNodeId), mResumptionId(resumptionId),
-        mSharedSecret(sharedSecret)
+        mFindMethodReturnCode(findMethodReturnCode),
+        mPeerNodeId(peerNodeId), mResumptionId(resumptionId), mSharedSecret(sharedSecret)
     {}
     SessionResumptionTestStorage(CHIP_ERROR findMethodReturnCode) : mFindMethodReturnCode(findMethodReturnCode) {}
     CHIP_ERROR FindByScopedNodeId(const ScopedNodeId & node, ResumptionIdStorage & resumptionId,
