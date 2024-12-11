@@ -106,6 +106,9 @@ public:
 
     CHIP_ERROR EncodeSigma1Fuzz(System::PacketBufferHandle & msg, CASESession::EncodeSigma1Param & inputParams,
                                 ByteSpan & initiatorEphPubKey);
+
+    void HandleSigma2(const vector<uint8_t> & InitiatorRandom, uint32_t fuzzInitiatorSessionId, FabricId fuzzedFabricId,
+                      const vector<uint8_t> & IPK, const vector<uint8_t> & rootPubKey);
 };
 
 /*------------------------------------------------------------------------------------------------------------------------------------*/
