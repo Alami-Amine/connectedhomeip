@@ -104,11 +104,16 @@ public:
                      const vector<uint8_t> & destinationIdentifier, FabricId fuzzedFabricId, const vector<uint8_t> & IPK,
                      const vector<uint8_t> & rootPubKey, const vector<uint8_t> & garbagePayload);
 
-    CHIP_ERROR EncodeSigma1Fuzz(System::PacketBufferHandle & msg, CASESession::EncodeSigma1Param & inputParams,
+    CHIP_ERROR EncodeSigma1Fuzz(System::PacketBufferHandle & msg, CASESession::EncodeSigma1Inputs & inputParams,
                                 ByteSpan & initiatorEphPubKey);
 
     void HandleSigma2(const vector<uint8_t> & InitiatorRandom, uint32_t fuzzInitiatorSessionId, FabricId fuzzedFabricId,
                       const vector<uint8_t> & IPK, const vector<uint8_t> & rootPubKey);
+
+    void EncodeParseSigma1RoundTrip(const vector<uint8_t> & InitiatorRandom, uint32_t fuzzInitiatorSessionId,
+                                    const vector<uint8_t> & destinationIdentifier, FabricId fuzzedFabricId,
+                                    const vector<uint8_t> & IPK, const vector<uint8_t> & rootPubKey,
+                                    const vector<uint8_t> & garbagePayload);
 };
 
 /*------------------------------------------------------------------------------------------------------------------------------------*/
@@ -345,7 +350,7 @@ System::PacketBufferHandle FuzzCASESession::GenerateSigma1(const vector<uint8_t>
     return msg_R1;
 }
 
-CHIP_ERROR FuzzCASESession::EncodeSigma1Fuzz(System::PacketBufferHandle & msg, CASESession::EncodeSigma1Param & inputParams,
+CHIP_ERROR FuzzCASESession::EncodeSigma1Fuzz(System::PacketBufferHandle & msg, CASESession::EncodeSigma1Inputs & inputParams,
                                              ByteSpan & initiatorEphPubKey)
 {
 
@@ -414,7 +419,7 @@ void FuzzCASESession::ParseSigma1(const vector<uint8_t> & InitiatorRandom, uint3
     CASESession pairingAccessory;
 
     /*********************************Constructing Sigma1*********************************/
-    CASESession::EncodeSigma1Param EncodeParams1;
+    CASESession::EncodeSigma1Inputs EncodeParams1;
     EncodeParams1.initiatorRandom    = fuzzInitiatorRandom;
     EncodeParams1.initiatorSessionId = fuzzInitiatorSessionId;
 
@@ -504,7 +509,7 @@ void FuzzCASESession::ParseSigma1(const vector<uint8_t> & InitiatorRandom, uint3
     // pairingAccessory.mExchangeCtxt.Emplace(*contextAccessory);
     // EXPECT_EQ(CHIP_NO_ERROR, pairingAccessory.ParseSigma1(tlvReader, OutputParseSigma1));
 
-    CASESession::ParseSigma1Param OutputParseSigma1;
+    CASESession::ParsedSigma1 OutputParseSigma1;
     pairingAccessory.ParseSigma1(tlvReader, OutputParseSigma1);
 
     // I NEED TO FINALIZE TLVREADER IF IT CRASHES
@@ -538,7 +543,7 @@ FUZZ_TEST(FuzzCASE_PW, ParseSigma1)
     .WithDomains(
         // InitiatorRandom (Original size = kSigmaParamRandomNumberSize)
         Arbitrary<vector<uint8_t>>(),
-        // fuzzInitiatorSessionId
+        // InitiatorSessionId
         Arbitrary<uint32_t>(),
         // DestinationIdentifier .WithSize(32), .WithSize(kSHA256_Hash_Length - 2)
         Arbitrary<vector<uint8_t>>(),
@@ -548,6 +553,135 @@ FUZZ_TEST(FuzzCASE_PW, ParseSigma1)
         Arbitrary<vector<uint8_t>>().WithSize(CHIP_CRYPTO_SYMMETRIC_KEY_LENGTH_BYTES),
         // rootPubKey (Original size = kP256_PublicKey_Length)
         Arbitrary<vector<uint8_t>>(),
+        // Garbage Message to pass to ParseSigma1
+        Arbitrary<vector<uint8_t>>());
+
+/****************************************************************************************************************** */
+/********************************************************************************************************************* */
+void FuzzCASESession::EncodeParseSigma1RoundTrip(const vector<uint8_t> & InitiatorRandom, uint32_t fuzzInitiatorSessionId,
+                                                 const vector<uint8_t> & destinationIdentifier, FabricId fuzzedFabricId,
+                                                 const vector<uint8_t> & IPK, const vector<uint8_t> & rootPubKey,
+                                                 const vector<uint8_t> & garbagePayload)
+{
+
+    /*CONSTRUCT SIGMA1*/
+
+    ByteSpan fuzzInitiatorRandom(InitiatorRandom.data(), InitiatorRandom.size());
+    ByteSpan fuzzedIPK(IPK.data(), IPK.size());
+    ByteSpan fuzzedRootPubKey(rootPubKey.data(), rootPubKey.size());
+
+    System::PacketBufferHandle msg;
+
+    CASESession pairingCommissioner;
+    CASESession pairingAccessory;
+
+    /*********************************Constructing Sigma1*********************************/
+    CASESession::EncodeSigma1Inputs EncodeParams1;
+    EncodeParams1.initiatorRandom    = fuzzInitiatorRandom;
+    EncodeParams1.initiatorSessionId = fuzzInitiatorSessionId;
+    EncodeParams1.destinationId      = ByteSpan(destinationIdentifier.data(), destinationIdentifier.size());
+
+    ReliableMessageProtocolConfig LocalMRPConfig(System::Clock::Milliseconds32(100), System::Clock::Milliseconds32(200),
+                                                 System::Clock::Milliseconds16(4000));
+    EncodeParams1.initiatorMrpConfig = &LocalMRPConfig;
+    // EncodeParams1.mrpConfig = nullptr;
+
+    // Encoding Sigma1 into PacketBufferHandle
+
+    // FixedByteSpan<65> EphemeralTest(*EphemeralKey->Pubkey().Bytes());
+    // mEphemeralKey->Pubkey() = EphemeralTest;
+
+    /*
+        ByteSpan PubKey(fuzzedRootPubKey.data(), fuzzedRootPubKey.size());
+
+        EXPECT_EQ(CHIP_NO_ERROR, EncodeSigma1Fuzz(msg, EncodeParams1, PubKey));
+    */
+
+    P256PublicKey key(reinterpret_cast<const uint8_t(&)[kP256_PublicKey_Length]>(*rootPubKey.data()));
+
+    EncodeParams1.pEphPubKey = &key;
+    ASSERT_EQ(CHIP_NO_ERROR, pairingAccessory.EncodeSigma1(msg, EncodeParams1));
+    // TODO: or use the API for this, ReleaseEphemeralKeypair
+    // EphemeralKey->Clear();
+    // Platform::Delete<Crypto::P256Keypair>(EphemeralKey);
+
+    System::PacketBufferTLVReader tlvReader;
+
+    // EXPECT_FALSE(msg.IsNull());
+
+    // THE BELOW CONDITION MIGHT BE NEEDED IF EncodeSigma1Fuzz could fail
+    if (msg.IsNull())
+    {
+        //     // In case EncodeSigma1 fails, we need to release buffers owned by the PacketBufferHandle `msg`
+        //     // msg = nullptr;
+        //     // We should skip the iteration when EncodeSigma1 fails
+        GTEST_SKIP() << "skipping because msg is null";
+    }
+    tlvReader.Init(std::move(msg));
+
+    // uint16_t initiatorSessionId;
+    // ByteSpan destinationIdentifier;
+    // ByteSpan initiatorRandom;
+
+    // bool sessionResumptionRequested = false;
+    // bool InitiatorMRPParamsPresent  = false;
+    // ByteSpan resumptionId;
+    // ByteSpan resume1MIC;
+    // ByteSpan initiatorPubKey;
+
+    // TODO: PARSERSIGMA1 NEEDS TO HAVE an EXCHANGE CONTEXT and to have an exchange context we need to have loopbackmessaging (or
+    // sessions and other stuff)
+    // TODO: SO LIEK THIS, I WILL GET A VERIFYORDIE RELATED TO MISSSING CONTEXT
+
+    //  ExchangeContext * contextAccessory = NewUnauthenticatedExchangeToBob(&pairingAccessory);
+
+    // pairingAccessory.mExchangeCtxt.Emplace(*contextAccessory);
+    // EXPECT_EQ(CHIP_NO_ERROR, pairingAccessory.ParseSigma1(tlvReader, OutputParseSigma1));
+
+    CASESession::ParsedSigma1 OutputParseSigma1;
+    pairingAccessory.ParseSigma1(tlvReader, OutputParseSigma1);
+
+    // I NEED TO FINALIZE TLVREADER IF IT CRASHES
+
+    // tlvReader.ExitContainer(TLV::kTLVType_Structure);
+
+    //  msg = nullptr;
+    // TODO: REMOVE OR MAKE IN ITS OWN TEST
+    //  trying passing garbage to ParseSigma1
+    // System::PacketBufferHandle garbagemsg = System::PacketBufferHandle::NewWithData(
+    //     garbagePayload.data(), garbagePayload.size(), /* aAdditionalSize = */ 0, /* aReservedSize = */ 0);
+    // System::PacketBufferTLVReader tlvReadergarbage;
+    // tlvReadergarbage.Init(std::move(garbagemsg));
+    // pairingAccessory.ParseSigma1(tlvReadergarbage, OutputParseSigma1);
+}
+
+void EncodeParseSigma1RoundTrip(const vector<uint8_t> & InitiatorRandom, uint32_t fuzzInitiatorSessionId,
+                                const vector<uint8_t> & destinationIdentifier, FabricId fuzzedFabricId, const vector<uint8_t> & IPK,
+                                const vector<uint8_t> & rootPubKey, const vector<uint8_t> & garbagePayload)
+{
+
+    ASSERT_EQ(chip::Platform::MemoryInit(), CHIP_NO_ERROR);
+    FuzzCASESession CaseSession;
+    // CaseSession.GenerateSigma1(InitiatorRandom, fuzzInitiatorSessionId, fuzzedFabricId, IPK, rootPubKey);
+    // CaseSession.HandleSigma1;
+    CaseSession.EncodeParseSigma1RoundTrip(InitiatorRandom, fuzzInitiatorSessionId, destinationIdentifier, fuzzedFabricId, IPK,
+                                           rootPubKey, garbagePayload);
+    chip::Platform::MemoryShutdown();
+}
+FUZZ_TEST(FuzzCASE_PW, EncodeParseSigma1RoundTrip)
+    .WithDomains(
+        // InitiatorRandom (Original size = kSigmaParamRandomNumberSize)
+        Arbitrary<vector<uint8_t>>(),
+        // InitiatorSessionId
+        Arbitrary<uint32_t>(),
+        // DestinationIdentifier .WithSize(32), .WithSize(kSHA256_Hash_Length - 2)
+        Arbitrary<vector<uint8_t>>(),
+        // FabricId
+        Arbitrary<FabricId>(),
+        // fuzzIPK, (Original size = CHIP_CRYPTO_SYMMETRIC_KEY_LENGTH_BYTES)
+        Arbitrary<vector<uint8_t>>().WithSize(CHIP_CRYPTO_SYMMETRIC_KEY_LENGTH_BYTES),
+        // rootPubKey (Original size = kP256_PublicKey_Length)
+        Arbitrary<vector<uint8_t>>().WithSize(kP256_PublicKey_Length),
         // Garbage Message to pass to ParseSigma1
         Arbitrary<vector<uint8_t>>());
 
