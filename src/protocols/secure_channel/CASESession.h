@@ -51,6 +51,10 @@
 
 namespace chip {
 
+namespace Testing {
+class FuzzCASESession;
+}
+
 // TODO: temporary derive from Messaging::UnsolicitedMessageHandler, actually the CASEServer should be the umh, it will be fixed
 // when implementing concurrent CASE session.
 class DLL_EXPORT CASESession : public Messaging::UnsolicitedMessageHandler,
@@ -304,7 +308,7 @@ protected:
 
 private:
     friend class TestCASESession;
-
+    friend class Testing::FuzzCASESession;
     using AutoReleaseSessionKey = Crypto::AutoReleaseSymmetricKey<Crypto::Aes128KeyHandle>;
 
     /*
