@@ -227,6 +227,7 @@ protected:
     {
         ByteSpan initiatorEphPubKey;
         bool initiatorMrpParamsPresent = false;
+        SessionParameters initiatorSessionParams;
     };
 
     struct EncodeSigma2Inputs
@@ -248,6 +249,29 @@ protected:
         MutableByteSpan resumeMIC{ sigma2ResumeMICBuffer };
         uint16_t responderSessionId;
         const ReliableMessageProtocolConfig * responderMrpConfig;
+    };
+
+    struct ParsedSigma2
+    {
+        // TODO responderRandom is ByteSpan in ParsedSigma2 but is an array in EncodeSigma2Inputs
+        ByteSpan responderRandom;
+        uint16_t responderSessionId;
+        // TODO, If I will inherit, remember that this different from EncodeSigma2Inputs
+        ByteSpan responderEphPubKey;
+
+        Platform::ScopedMemoryBufferWithSize<uint8_t> msgR2Encrypted;
+        size_t encrypted2Length = 0;
+        const ReliableMessageProtocolConfig * responderMrpConfig;
+        bool responderMrpParamsPresent = false;
+        SessionParameters responderSessionParams;
+    };
+
+    struct ParsedSigma2TBEData
+    {
+        ByteSpan responderNOC;
+        ByteSpan responderICAC;
+        Crypto::P256ECDSASignature tbsData2Signature;
+        ByteSpan resumptionId;
     };
 
     /**
@@ -279,8 +303,11 @@ protected:
      * and the resumptionID and initiatorResumeMIC fields will be set to
      * valid values, or the sessionResumptionRequested field will be set to false.
      */
-    CHIP_ERROR ParseSigma1(TLV::ContiguousBufferTLVReader & tlvReader, ParsedSigma1 & parsedMessage);
+    static CHIP_ERROR ParseSigma1(TLV::ContiguousBufferTLVReader & tlvReader, ParsedSigma1 & parsedMessage);
 
+    static CHIP_ERROR ParseSigma2(TLV::ContiguousBufferTLVReader & tlvReader, ParsedSigma2 & parsedMessage);
+
+    static CHIP_ERROR ParseSigma2TBEData(TLV::ContiguousBufferTLVReader & tlvReader, ParsedSigma2TBEData & parsedMessage);
     /**
      * @brief  Encodes a Sigma2 message into TLV format and allocates a buffer for it, which is owned by the PacketBufferHandle
      *         outparam.
