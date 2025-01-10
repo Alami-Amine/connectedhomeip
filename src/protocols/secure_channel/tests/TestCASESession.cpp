@@ -778,10 +778,9 @@ static CHIP_ERROR EncodeSigma1Helper(MutableByteSpan & buf)
                                                                                                                                    \
         TLV::ContiguousBufferTLVReader reader;                                                                                     \
         reader.Init(buf);                                                                                                          \
-        CASESessionAccess session;                                                                                                 \
         CASESessionAccess::ParsedSigma1 parsedSigma1;                                                                              \
                                                                                                                                    \
-        EXPECT_EQ(session.ParseSigma1(reader, parsedSigma1) == CHIP_NO_ERROR, params::kExpectSuccess);                             \
+        EXPECT_EQ(CASESessionAccess::ParseSigma1(reader, parsedSigma1) == CHIP_NO_ERROR, params::kExpectSuccess);                  \
         if (params::kExpectSuccess)                                                                                                \
         {                                                                                                                          \
             EXPECT_EQ(parsedSigma1.sessionResumptionRequested,                                                                     \
@@ -967,10 +966,9 @@ TEST_F(TestCASESession, EncodeSigma1Test)
         System::PacketBufferTLVReader tlvReader;
         tlvReader.Init(std::move(msg1));
 
-        CASESessionAccess session;
         CASESessionAccess::ParsedSigma1 parsedMessage;
 
-        EXPECT_EQ(CHIP_NO_ERROR, session.ParseSigma1(tlvReader, parsedMessage));
+        EXPECT_EQ(CHIP_NO_ERROR, CASESessionAccess::ParseSigma1(tlvReader, parsedMessage));
 
         // compare parsed values with original values
         EXPECT_TRUE(parsedMessage.initiatorRandom.data_equal(encodeParams.initiatorRandom));
@@ -1001,10 +999,9 @@ TEST_F(TestCASESession, EncodeSigma1Test)
         System::PacketBufferTLVReader tlvReader;
         tlvReader.Init(std::move(msg2));
 
-        CASESessionAccess session;
         CASESessionAccess::ParsedSigma1 parsedMessage;
 
-        EXPECT_EQ(CHIP_NO_ERROR, session.ParseSigma1(tlvReader, parsedMessage));
+        EXPECT_EQ(CHIP_NO_ERROR, CASESessionAccess::ParseSigma1(tlvReader, parsedMessage));
 
         // RoundTrip
         EXPECT_TRUE(parsedMessage.initiatorRandom.data_equal(encodeParams.initiatorRandom));
