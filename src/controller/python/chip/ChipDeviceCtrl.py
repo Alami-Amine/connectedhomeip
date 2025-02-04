@@ -27,6 +27,17 @@
 
 # Needed to use types in type hints before they are fully defined.
 from __future__ import absolute_import, annotations, print_function
+from .native import PyChipError
+from .interaction_model import SessionParameters, SessionParametersStruct
+from .crypto import p256keypair
+from .clusters.CHIPClusters import ChipClusters
+from .clusters import Command as ClusterCommand
+from .clusters import ClusterObjects as ClusterObjects
+from .clusters import Attribute as ClusterAttribute
+from . import discovery
+from . import clusters as Clusters
+from . import FabricAdmin
+import dacite  # type: ignore
 
 import asyncio
 import builtins
@@ -43,18 +54,9 @@ from ctypes import (CDLL, CFUNCTYPE, POINTER, Structure, byref, c_bool, c_char, 
                     c_uint16, c_uint32, c_uint64, c_void_p, cast, create_string_buffer, pointer, py_object, resize, string_at)
 from dataclasses import dataclass
 
-import dacite  # type: ignore
+from . import ChipStack  # Ensure this import is correct
+builtins.chipStack = cast(ChipStack, builtins.chipStack)
 
-from . import FabricAdmin
-from . import clusters as Clusters
-from . import discovery
-from .clusters import Attribute as ClusterAttribute
-from .clusters import ClusterObjects as ClusterObjects
-from .clusters import Command as ClusterCommand
-from .clusters.CHIPClusters import ChipClusters
-from .crypto import p256keypair
-from .interaction_model import SessionParameters, SessionParametersStruct
-from .native import PyChipError
 
 __all__ = ["ChipDeviceController", "CommissioningParameters"]
 
