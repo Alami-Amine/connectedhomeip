@@ -50,19 +50,12 @@ void ChipCertFuzzer(const std::vector<std::uint8_t> & bytes)
     }
 
     {
-        uint8_t outCertBuf[kMaxDERCertLength];
-        MutableByteSpan outCert(outCertBuf);
-        (void) ConvertChipCertToX509Cert(span, outCert);
-    }
-
-    {
         // TODO: #35369 Move this to a Fixture once Errors related to FuzzTest Fixtures are resolved
         ASSERT_EQ(chip::Platform::MemoryInit(), CHIP_NO_ERROR);
         ValidateChipRCAC(span);
         chip::Platform::MemoryShutdown();
     }
 }
-
 FUZZ_TEST(FuzzChipCert, ChipCertFuzzer).WithDomains(Arbitrary<std::vector<std::uint8_t>>());
 
 // The Property function for DecodeChipCertFuzzer, The FUZZ_TEST Macro will call this function.
@@ -92,4 +85,92 @@ auto AnyCertDecodeFlag()
 }
 
 FUZZ_TEST(FuzzChipCert, DecodeChipCertFuzzer).WithDomains(Arbitrary<std::vector<std::uint8_t>>(), AnyCertDecodeFlag());
+
+/******************************************************************************************************************* */
+/********************************************************************** */
+std::string certsDir =
+    "/home/aya/repos/connectedhomeipDELETEME/connectedhomeip/credentials/test/operational-certificates-error-cases/";
+
+// Lambda that reads certificates in "Matter Format "from a directory and returns them as a vector of strings, to be used as seeds
+// TODO, consider factoring this out into a utility function that can be called ? libavif have an example
+auto seedProviderChipCerts = []() -> std::vector<std::string> {
+    // fuzztest::ReadFilesFromDirectory returns a vector of tuples, each tuple contains one of the DER encoded certificates
+    // We need to unpack the tuples and then extract file content into a vector of strings.
+    std::vector<std::tuple<std::string>> tupleVector = ReadFilesFromDirectory(certsDir);
+    std::vector<std::string> seeds;
+
+    if (tupleVector.size() == 0)
+    {
+        std::cout << "No Matching Seed files found in the directory" << std::endl;
+    }
+
+    for (auto & [fileContents] : tupleVector)
+    {
+        seeds.push_back(fileContents);
+    }
+    return seeds;
+};
+
+void ConvertChipCertToX509CertFuzz(const std::string & fuzzChipCerts)
+{
+    ByteSpan span(reinterpret_cast<const uint8_t *>(fuzzChipCerts.data()), fuzzChipCerts.size());
+
+    uint8_t outCertBuf[kMaxDERCertLength];
+    MutableByteSpan outCert(outCertBuf);
+    (void) ConvertChipCertToX509Cert(span, outCert);
+}
+FUZZ_TEST(FuzzChipCert, ConvertChipCertToX509CertFuzz).WithDomains(Arbitrary<std::string>().WithSeeds(seedProviderChipCerts));
+
+/******************************************************************************** */
+
+// Lambda that reads DER encoded certificates from a directory and returns them as a vector of strings, to be used as seeds
+auto seedProviderDerCerts = []() -> std::vector<std::string> {
+    // fuzztest::ReadFilesFromDirectory returns a vector of tuples, each tuple contains one of the DER encoded certificates
+    // We need to unpack the tuples and then extract file content into a vector of strings.
+    std::vector<std::tuple<std::string>> tupleVector = ReadFilesFromDirectory(certsDir);
+    std::vector<std::string> seeds;
+
+    if (tupleVector.size() == 0)
+    {
+        std::cout << "No Matching Seed files found in the directory" << std::endl;
+    }
+
+    for (auto & [fileContents] : tupleVector)
+    {
+        seeds.push_back(fileContents);
+    }
+    return seeds;
+};
+
+std::string kDictionaryPath = "/home/aya/repos/connectedhomeipDELETEME/connectedhomeip/src/credentials/tests/dict/der.dict";
+
+void ConvertX509CertToChipCertFuzz(const std::string & fuzzDerCerts)
+{
+    ByteSpan span(reinterpret_cast<const uint8_t *>(fuzzDerCerts.data()), fuzzDerCerts.size());
+
+    uint8_t outCertBuf[kMaxDERCertLength];
+    MutableByteSpan outCert(outCertBuf);
+
+    CHIP_ERROR err = CHIP_NO_ERROR;
+
+    err = ConvertX509CertToChipCert(span, outCert);
+    std::cout << err.Format() << std::endl;
+}
+FUZZ_TEST(FuzzChipCert, ConvertX509CertToChipCertFuzz)
+    .WithDomains(Arbitrary<std::string>().WithSeeds(seedProviderDerCerts).WithDictionary(ReadDictionaryFromFile(kDictionaryPath)));
+
+void ExtractSubjectDNFromX509CertFuzz(const std::string & fuzzDerCerts)
+{
+    ByteSpan span(reinterpret_cast<const uint8_t *>(fuzzDerCerts.data()), fuzzDerCerts.size());
+    ChipDN subjectDN;
+    CHIP_ERROR err = ExtractSubjectDNFromX509Cert(span, subjectDN);
+    std::cout << err.Format() << std::endl;
+}
+FUZZ_TEST(FuzzChipCert, ExtractSubjectDNFromX509CertFuzz)
+    .WithDomains(Arbitrary<std::string>().WithSeeds(seedProviderDerCerts).WithDictionary(ReadDictionaryFromFile(kDictionaryPath)));
+
+//.WithDomains(Arbitrary<std::vector<std::uint8_t>>().WithSeeds(fuzztest::ReadFilesFromDirectory(kMyCorpusPath)));
+
+// credentials/test/operational-certificates-error-cases/Chip-Test-ICAC-Cert-Version-V2-Cert.der
+
 } // namespace
