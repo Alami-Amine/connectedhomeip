@@ -1047,6 +1047,16 @@ CASESession::NextStep CASESession::HandleSigma1(System::PacketBufferHandle && ms
     ReturnErrorVariantOnFailure(NextStep, mCommissioningHash.AddData(ByteSpan{ msg->Start(), msg->DataLength() }));
 
     System::PacketBufferTLVReader tlvReader;
+
+    uint8_t test[1000];
+    printf("msg->DataLength() = %zu\n", msg->DataLength());
+    msg->Read(test, msg->DataLength());
+    ChipLogDetail(SecureChannel, "AMINE: HandleSigma1");
+    for (size_t i = 0; i <= msg->DataLength(); i++)
+    {
+        printf("0x%02x, ", test[i]);
+    }
+    printf("\n");
     tlvReader.Init(std::move(msg));
 
     // Struct that will serve as output in ParseSigma1
@@ -1366,6 +1376,17 @@ CHIP_ERROR CASESession::HandleSigma2Resume(System::PacketBufferHandle && msg)
     MATTER_LOG_METRIC_END(kMetricDeviceCASESessionSigma1, err);
 
     System::PacketBufferTLVReader tlvReader;
+
+    uint8_t test[1000];
+    printf("msg->DataLength() = %zu\n", msg->DataLength());
+    msg->Read(test, msg->DataLength());
+    ChipLogDetail(SecureChannel, "AMINE: HandleSigma2Resume");
+    for (size_t i = 0; i <= msg->DataLength(); i++)
+    {
+        printf("0x%02x, ", test[i]);
+    }
+    printf("\n");
+
     tlvReader.Init(std::move(msg));
     ParsedSigma2Resume parsedSigma2Resume;
     SuccessOrExit(err = ParseSigma2Resume(tlvReader, parsedSigma2Resume));
@@ -1491,6 +1512,15 @@ CHIP_ERROR CASESession::HandleSigma2(System::PacketBufferHandle && msg)
     }
 
     System::PacketBufferTLVReader tlvReader;
+    uint8_t test[1000];
+    printf("msg->DataLength() = %zu\n", msg->DataLength());
+    msg->Read(test, msg->DataLength());
+    ChipLogDetail(SecureChannel, "AMINE: HandleSigma2");
+    for (size_t i = 0; i <= msg->DataLength(); i++)
+    {
+        printf("0x%02x, ", test[i]);
+    }
+    printf("\n");
     tlvReader.Init(std::move(msg));
     ParsedSigma2 parsedSigma2;
     ReturnErrorOnFailure(ParseSigma2(tlvReader, parsedSigma2));
@@ -1520,6 +1550,15 @@ CHIP_ERROR CASESession::HandleSigma2(System::PacketBufferHandle && msg)
 
     parsedSigma2.msgR2Decrypted = std::move(parsedSigma2.msgR2Encrypted);
     size_t msgR2DecryptedLength = parsedSigma2.msgR2EncryptedPayload.size();
+
+    uint8_t test2[1000];
+    memcpy(test2, parsedSigma2.msgR2Decrypted.Get(), msgR2DecryptedLength);
+    ChipLogDetail(SecureChannel, "AMINE: Sigma2TBEData");
+    for (size_t i = 0; i <= msgR2DecryptedLength; i++)
+    {
+        printf("0x%02x, ", test2[i]);
+    }
+    printf("\n");
 
     ContiguousBufferTLVReader decryptedDataTlvReader;
     decryptedDataTlvReader.Init(parsedSigma2.msgR2Decrypted.Get(), msgR2DecryptedLength);
@@ -1938,6 +1977,15 @@ CHIP_ERROR CASESession::HandleSigma3a(System::PacketBufferHandle && msg)
         ByteSpan msgR3MIC;
         {
             System::PacketBufferTLVReader tlvReader;
+            uint8_t test[1000];
+            printf("msg->DataLength() = %zu\n", msg->DataLength());
+            msg->Read(test, msg->DataLength());
+            ChipLogDetail(SecureChannel, "AMINE: HandleSigma3");
+            for (size_t i = 0; i <= msg->DataLength(); i++)
+            {
+                printf("0x%02x, ", test[i]);
+            }
+            printf("\n");
             tlvReader.Init(std::move(msg));
             SuccessOrExit(err = ParseSigma3(tlvReader, msgR3Encrypted, msgR3EncryptedPayload, msgR3MIC));
 
@@ -1953,6 +2001,15 @@ CHIP_ERROR CASESession::HandleSigma3a(System::PacketBufferHandle && msg)
         SuccessOrExit(err = AES_CCM_decrypt(msgR3EncryptedPayload.data(), msgR3EncryptedPayload.size(), nullptr, 0, msgR3MIC.data(),
                                             msgR3MIC.size(), sr3k.KeyHandle(), kTBEData3_Nonce, kTBEDataNonceLength,
                                             msgR3EncryptedPayload.data()));
+
+        uint8_t test2[1000];
+        memcpy(test2, msgR3EncryptedPayload.data(), msgR3EncryptedPayload.size());
+        ChipLogDetail(SecureChannel, "AMINE: Sigma3TBEData");
+        for (size_t i = 0; i <= msgR3EncryptedPayload.size(); i++)
+        {
+            printf("0x%02x, ", test2[i]);
+        }
+        printf("\n");
 
         decryptedDataTlvReader.Init(msgR3EncryptedPayload.data(), msgR3EncryptedPayload.size());
         SuccessOrExit(err = ParseSigma3TBEData(decryptedDataTlvReader, data));
