@@ -25,6 +25,7 @@
 
 #include "AdditionalDataPayload.h"
 
+#include <cstdint>
 #include <lib/core/CHIPError.h>
 #include <stdint.h>
 
