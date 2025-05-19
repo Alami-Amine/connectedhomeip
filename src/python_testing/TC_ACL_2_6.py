@@ -272,8 +272,14 @@ class TC_ACL_2_6(MatterBaseTest):
         asserts.assert_false(found_invalid_event, "Should not find event for invalid entry")
 
         self.step(8)
+<<<<<<< HEAD
         if force_legacy_encoding:
             logging.info("Rerunning test with new list method")
+=======
+        # Rerunning test with new write list method
+        if force_legacy_encoding:
+            logging.info("Rerunning test with new write list method")
+>>>>>>> 4868f8d02c (Updating TC_ACL_2_6 python3 test module:)
 
     def steps_TC_ACL_2_6(self) -> list[TestStep]:
         steps = [
@@ -288,7 +294,12 @@ class TC_ACL_2_6(MatterBaseTest):
             TestStep(6, "TH1 writes DUT Endpoint 0 AccessControl cluster ACL attribute, value is list of AccessControlEntryStruct containing 2 elements. The first item is valid, the second item is invalid due to group ID 0 being used, which is illegal.", "Result is CONSTRAINT_ERROR"),
             TestStep(7, "TH1 reads DUT Endpoint 0 AccessControl cluster AccessControlEntryChanged event",
                      "value MUST NOT contain an AccessControlEntryChanged entry corresponding to the second invalid entry in step 6."),
+<<<<<<< HEAD
             TestStep(8, "Rerunning test steps with new list method", "Rerunning test steps with new list method"),
+=======
+            TestStep(8, "Rerunning test with new write list method",
+                        "Rerunning test with new write list method")
+>>>>>>> 4868f8d02c (Updating TC_ACL_2_6 python3 test module:)
         ]
         return steps
 
