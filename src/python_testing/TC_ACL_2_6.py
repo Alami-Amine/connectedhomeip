@@ -42,6 +42,11 @@ from mobly import asserts
 
 
 class TC_ACL_2_6(MatterBaseTest):
+    async def get_latest_event_number(self, acec_event: Clusters.AccessControl.Events.AccessControlExtensionChanged) -> int:
+        event_path = [(self.matter_test_config.endpoint, acec_event, 1)]
+        events = await self.default_controller.ReadEvent(nodeid=self.dut_node_id, events=event_path)
+        return max([e.Header.EventNumber for e in events])
+
     def desc_TC_ACL_2_6(self) -> str:
         return "[TC-ACL-2.6] AccessControlEntryChanged event"
 
@@ -93,9 +98,7 @@ class TC_ACL_2_6(MatterBaseTest):
                 break
         asserts.assert_true(found, "Expected event not found in response")
 
-        event_path = [(self.matter_test_config.endpoint, acec_event, 1)]
-        initial_events = await self.default_controller.ReadEvent(nodeid=self.dut_node_id, events=event_path)
-        initial_event_num = [e.Header.EventNumber for e in initial_events]
+        latest_event_number = await self.get_latest_event_number(acec_event)
 
         self.step(4)
         # Write ACL attribute
@@ -129,9 +132,9 @@ class TC_ACL_2_6(MatterBaseTest):
         if not force_legacy_encoding:
             events_response2 = await self.default_controller.ReadEvent(
                 nodeid=self.dut_node_id,
-                events=event_path,
+                events=[(0, acec_event)],
                 fabricFiltered=True,
-                eventNumberFilter=max(initial_event_num)+1
+                eventNumberFilter=latest_event_number + 1
             )
 
             # Check if both ACL entries are present in the events' latestValue field
@@ -148,7 +151,7 @@ class TC_ACL_2_6(MatterBaseTest):
                 self.dut_node_id,
                 events=[(0, acec_event)],
                 fabricFiltered=True,
-                eventNumberFilter=max(initial_event_num)+1
+                eventNumberFilter=latest_event_number + 1
             )
         logging.info(f"Events response: {events_response2}")
         if not force_legacy_encoding:
@@ -259,7 +262,8 @@ class TC_ACL_2_6(MatterBaseTest):
         events_response3 = await self.th1.ReadEvent(
             self.dut_node_id,
             events=[(0, acec_event)],
-            fabricFiltered=True
+            fabricFiltered=True,
+            eventNumberFilter=latest_event_number + 1
         )
 
         found_invalid_event = False
@@ -274,6 +278,21 @@ class TC_ACL_2_6(MatterBaseTest):
         self.step(8)
         if force_legacy_encoding:
             logging.info("Rerunning test with new list method")
+
+                # Clean up at the end
+        try:
+            if hasattr(self, 'th2'):
+                await self.th2.RemoveFabric(self.dut_node_id)
+                await asyncio.sleep(1)
+                self.th2.Shutdown()
+            if hasattr(self, 'th1'):
+                await self.th1.RemoveFabric(self.dut_node_id)
+                await asyncio.sleep(1)
+                self.th1.Shutdown()
+            logging.info("Successfully cleaned up fabrics and controllers")
+        except Exception as e:
+            logging.warning(f"Error during cleanup: {e}")
+
 
     def steps_TC_ACL_2_6(self) -> list[TestStep]:
         steps = [
