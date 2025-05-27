@@ -283,11 +283,9 @@ class TC_ACL_2_6(MatterBaseTest):
         try:
             if hasattr(self, 'th2'):
                 await self.th2.RemoveFabric(self.dut_node_id)
-                await asyncio.sleep(1)
                 self.th2.Shutdown()
             if hasattr(self, 'th1'):
                 await self.th1.RemoveFabric(self.dut_node_id)
-                await asyncio.sleep(1)
                 self.th1.Shutdown()
             logging.info("Successfully cleaned up fabrics and controllers")
         except Exception as e:
