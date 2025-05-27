@@ -48,7 +48,6 @@ class TC_ACL_2_6(MatterBaseTest):
             events = await self.default_controller.ReadEvent(nodeid=self.dut_node_id, events=event_path)
             return events[0].Header.EventNumber  # fallback to first event if no match found
 
-
         if altitude == "max":
             event_path = [(self.matter_test_config.endpoint, acec_event, 1)]
             events = await self.default_controller.ReadEvent(nodeid=self.dut_node_id, events=event_path)
@@ -79,7 +78,8 @@ class TC_ACL_2_6(MatterBaseTest):
             fabricFiltered=True,
             eventNumberFilter=oldest_event_number
         )
-        events_response = [events_response[0]] # Getting the initial event from commissioning, validating it is the one we are expecting as it adds the admin entry for our controller for access control.
+        # Getting the initial event from commissioning, validating it is the one we are expecting as it adds the admin entry for our controller for access control.
+        events_response = [events_response[0]]
         logging.info(f"Events response: {events_response}")
         expected_event = Clusters.AccessControl.Events.AccessControlEntryChanged(
             adminNodeID=NullValue,
