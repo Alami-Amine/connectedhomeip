@@ -42,10 +42,17 @@ from mobly import asserts
 
 
 class TC_ACL_2_6(MatterBaseTest):
-    async def get_latest_event_number(self, acec_event: Clusters.AccessControl.Events.AccessControlExtensionChanged) -> int:
-        event_path = [(self.matter_test_config.endpoint, acec_event, 1)]
-        events = await self.default_controller.ReadEvent(nodeid=self.dut_node_id, events=event_path)
-        return max([e.Header.EventNumber for e in events])
+    async def get_latest_event_number(self, acec_event: Clusters.AccessControl.Events.AccessControlExtensionChanged, altitude: str) -> int:
+        if altitude == "min":
+            event_path = [(self.matter_test_config.endpoint, acec_event, 1)]
+            events = await self.default_controller.ReadEvent(nodeid=self.dut_node_id, events=event_path)
+            return events[0].Header.EventNumber  # fallback to first event if no match found
+
+
+        if altitude == "max":
+            event_path = [(self.matter_test_config.endpoint, acec_event, 1)]
+            events = await self.default_controller.ReadEvent(nodeid=self.dut_node_id, events=event_path)
+            return max([e.Header.EventNumber for e in events])
 
     def desc_TC_ACL_2_6(self) -> str:
         return "[TC-ACL-2.6] AccessControlEntryChanged event"
@@ -65,11 +72,14 @@ class TC_ACL_2_6(MatterBaseTest):
         # Created new follow-up task here: https://github.com/project-chip/matter-test-scripts/issues/548
         self.step(3)
         acec_event = Clusters.AccessControl.Events.AccessControlEntryChanged
+        oldest_event_number = await self.get_latest_event_number(acec_event, "min")
         events_response = await self.th1.ReadEvent(
             self.dut_node_id,
-            events=[(0, acec_event)],
-            fabricFiltered=True
+            events=[(0, acec_event, 1)],
+            fabricFiltered=True,
+            eventNumberFilter=oldest_event_number
         )
+        events_response = [events_response[0]] # Getting the initial event from commissioning, validating it is the one we are expecting as it adds the admin entry for our controller for access control.
         logging.info(f"Events response: {events_response}")
         expected_event = Clusters.AccessControl.Events.AccessControlEntryChanged(
             adminNodeID=NullValue,
@@ -84,12 +94,7 @@ class TC_ACL_2_6(MatterBaseTest):
             ),
             fabricIndex=f1
         )
-        # If force_legacy_encoding is true then this is the legacy list method for 1st loop iteration of test steps, then the length of the list should be 1
-        # The new list method should have 5 events since its the 2nd loop iteration of test steps
-        if force_legacy_encoding:
-            asserts.assert_equal(len(events_response), 1, "Expected 1 event")
-        else:
-            asserts.assert_equal(len(events_response), 5, "Expected 5 events")
+        asserts.assert_equal(len(events_response), 1, "Expected 1 event")
 
         found = False
         for event in events_response:
@@ -98,7 +103,7 @@ class TC_ACL_2_6(MatterBaseTest):
                 break
         asserts.assert_true(found, "Expected event not found in response")
 
-        latest_event_number = await self.get_latest_event_number(acec_event)
+        latest_event_number = await self.get_latest_event_number(acec_event, "max")
 
         self.step(4)
         # Write ACL attribute
@@ -278,18 +283,6 @@ class TC_ACL_2_6(MatterBaseTest):
         self.step(8)
         if force_legacy_encoding:
             logging.info("Rerunning test with new list method")
-
-            # Clean up at the end
-        try:
-            if hasattr(self, 'th2'):
-                await self.th2.RemoveFabric(self.dut_node_id)
-                self.th2.Shutdown()
-            if hasattr(self, 'th1'):
-                await self.th1.RemoveFabric(self.dut_node_id)
-                self.th1.Shutdown()
-            logging.info("Successfully cleaned up fabrics and controllers")
-        except Exception as e:
-            logging.warning(f"Error during cleanup: {e}")
 
     def steps_TC_ACL_2_6(self) -> list[TestStep]:
         steps = [
