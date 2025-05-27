@@ -258,7 +258,8 @@ class TC_ACL_2_6(MatterBaseTest):
 
         result = await self.th1.WriteAttribute(
             self.dut_node_id,
-            [(0, acl_attr(value=invalid_acl_entries))]
+            [(0, acl_attr(value=invalid_acl_entries))],
+            forceLegacyListEncoding=force_legacy_encoding
         )
         asserts.assert_equal(result[0].Status, Status.ConstraintError, "Write should have failed with CONSTRAINT_ERROR")
 
