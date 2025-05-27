@@ -50,7 +50,7 @@ class TC_ACL_2_6(MatterBaseTest):
     def desc_TC_ACL_2_6(self) -> str:
         return "[TC-ACL-2.6] AccessControlEntryChanged event"
 
-    async def internal_test_TC_ACL_2_6(self, force_legacy_encoding = bool):
+    async def internal_test_TC_ACL_2_6(self, force_legacy_encoding=bool):
         self.step(1)
         # Initialize TH1 controller
         self.th1 = self.default_controller
@@ -89,7 +89,7 @@ class TC_ACL_2_6(MatterBaseTest):
         if force_legacy_encoding:
             asserts.assert_equal(len(events_response), 1, "Expected 1 event")
         else:
-              asserts.assert_equal(len(events_response), 5, "Expected 5 events")
+            asserts.assert_equal(len(events_response), 5, "Expected 5 events")
 
         found = False
         for event in events_response:
@@ -161,78 +161,78 @@ class TC_ACL_2_6(MatterBaseTest):
             logging.info(f"Events response: {len(events_response2)}")
             asserts.assert_true(len(events_response2) == 3, "Expected 3 events")
             asserts.assert_equal(events_response2[0].Data.changeType,
-                             Clusters.AccessControl.Enums.ChangeTypeEnum.kRemoved,
-                             "Expected Removed change type")
+                                 Clusters.AccessControl.Enums.ChangeTypeEnum.kRemoved,
+                                 "Expected Removed change type")
             asserts.assert_in('chip.clusters.Types.Nullable', str(type(events_response2[0].Data.adminPasscodeID)),
-                            "AdminPasscodeID should be Null")
+                              "AdminPasscodeID should be Null")
             asserts.assert_equal(events_response2[0].Data.adminNodeID,
-                                self.default_controller.nodeId,
-                                "AdminNodeID should be the controller node ID")
+                                 self.default_controller.nodeId,
+                                 "AdminNodeID should be the controller node ID")
             asserts.assert_equal(events_response2[0].Data.latestValue,
-                                Clusters.AccessControl.Structs.AccessControlEntryStruct(
-                                    privilege=Clusters.AccessControl.Enums.AccessControlEntryPrivilegeEnum.kAdminister,
-                                    authMode=Clusters.AccessControl.Enums.AccessControlEntryAuthModeEnum.kCase,
-                                    subjects=[self.th1.nodeId],
-                                    targets=NullValue,
-                                    fabricIndex=f1
-                                ),
-                                "LatestValue should match AccessControlEntryStruct")
+                                 Clusters.AccessControl.Structs.AccessControlEntryStruct(
+                privilege=Clusters.AccessControl.Enums.AccessControlEntryPrivilegeEnum.kAdminister,
+                authMode=Clusters.AccessControl.Enums.AccessControlEntryAuthModeEnum.kCase,
+                subjects=[self.th1.nodeId],
+                targets=NullValue,
+                fabricIndex=f1
+            ),
+                "LatestValue should match AccessControlEntryStruct")
             asserts.assert_equal(events_response2[0].Data.latestValue.fabricIndex,
-                                f1,
-                                "LatestValue.FabricIndex should be the current fabric index")
+                                 f1,
+                                 "LatestValue.FabricIndex should be the current fabric index")
             asserts.assert_equal(events_response2[0].Data.fabricIndex,
-                                f1,
-                                "FabricIndex should be the current fabric index")
+                                 f1,
+                                 "FabricIndex should be the current fabric index")
 
-            # event 2 
+            # event 2
             asserts.assert_equal(events_response2[1].Data.changeType,
-                             Clusters.AccessControl.Enums.ChangeTypeEnum.kAdded,
-                             "Expected Added change type")
+                                 Clusters.AccessControl.Enums.ChangeTypeEnum.kAdded,
+                                 "Expected Added change type")
             asserts.assert_in('chip.clusters.Types.Nullable', str(type(events_response2[1].Data.adminPasscodeID)),
-                            "AdminPasscodeID should be Null")
+                              "AdminPasscodeID should be Null")
             asserts.assert_equal(events_response2[1].Data.adminNodeID,
-                                self.default_controller.nodeId,
-                                "AdminNodeID should be the controller node ID")
+                                 self.default_controller.nodeId,
+                                 "AdminNodeID should be the controller node ID")
             asserts.assert_equal(events_response2[1].Data.latestValue,
-                                Clusters.AccessControl.Structs.AccessControlEntryStruct(
-                                    privilege=Clusters.AccessControl.Enums.AccessControlEntryPrivilegeEnum.kAdminister,
-                                    authMode=Clusters.AccessControl.Enums.AccessControlEntryAuthModeEnum.kCase,
-                                    subjects=[self.th1.nodeId],
-                                    targets=NullValue,
-                                    fabricIndex=f1
-                                ),
-                                "LatestValue should match AccessControlEntryStruct")
+                                 Clusters.AccessControl.Structs.AccessControlEntryStruct(
+                privilege=Clusters.AccessControl.Enums.AccessControlEntryPrivilegeEnum.kAdminister,
+                authMode=Clusters.AccessControl.Enums.AccessControlEntryAuthModeEnum.kCase,
+                subjects=[self.th1.nodeId],
+                targets=NullValue,
+                fabricIndex=f1
+            ),
+                "LatestValue should match AccessControlEntryStruct")
             asserts.assert_equal(events_response2[1].Data.latestValue.fabricIndex,
-                                f1,
-                                "LatestValue.FabricIndex should be the current fabric index")
+                                 f1,
+                                 "LatestValue.FabricIndex should be the current fabric index")
             asserts.assert_equal(events_response2[1].Data.fabricIndex,
-                                f1,
-                                "FabricIndex should be the current fabric index")
+                                 f1,
+                                 "FabricIndex should be the current fabric index")
 
             # event 3
             asserts.assert_equal(events_response2[2].Data.changeType,
-                             Clusters.AccessControl.Enums.ChangeTypeEnum.kAdded,
-                             "Expected Added change type")
+                                 Clusters.AccessControl.Enums.ChangeTypeEnum.kAdded,
+                                 "Expected Added change type")
             asserts.assert_in('chip.clusters.Types.Nullable', str(type(events_response2[2].Data.adminPasscodeID)),
-                            "AdminPasscodeID should be Null")
+                              "AdminPasscodeID should be Null")
             asserts.assert_equal(events_response2[2].Data.adminNodeID,
-                                self.default_controller.nodeId,
-                                "AdminNodeID should be the controller node ID")
+                                 self.default_controller.nodeId,
+                                 "AdminNodeID should be the controller node ID")
             asserts.assert_equal(events_response2[2].Data.latestValue,
-                                Clusters.AccessControl.Structs.AccessControlEntryStruct(
-                                    privilege=Clusters.AccessControl.Enums.AccessControlEntryPrivilegeEnum.kView,
-                                    authMode=Clusters.AccessControl.Enums.AccessControlEntryAuthModeEnum.kCase,
-                                    subjects=[self.th1.nodeId],
-                                    targets=NullValue,
-                                    fabricIndex=f1
-                                ),
-                                "LatestValue should match AccessControlEntryStruct")
+                                 Clusters.AccessControl.Structs.AccessControlEntryStruct(
+                privilege=Clusters.AccessControl.Enums.AccessControlEntryPrivilegeEnum.kView,
+                authMode=Clusters.AccessControl.Enums.AccessControlEntryAuthModeEnum.kCase,
+                subjects=[self.th1.nodeId],
+                targets=NullValue,
+                fabricIndex=f1
+            ),
+                "LatestValue should match AccessControlEntryStruct")
             asserts.assert_equal(events_response2[2].Data.latestValue.fabricIndex,
-                                f1,
-                                "LatestValue.FabricIndex should be the current fabric index")
+                                 f1,
+                                 "LatestValue.FabricIndex should be the current fabric index")
             asserts.assert_equal(events_response2[2].Data.fabricIndex,
-                                f1,
-                                "FabricIndex should be the current fabric index")
+                                 f1,
+                                 "FabricIndex should be the current fabric index")
 
         self.step(6)
         # Write invalid ACL attribute
@@ -279,7 +279,7 @@ class TC_ACL_2_6(MatterBaseTest):
         if force_legacy_encoding:
             logging.info("Rerunning test with new list method")
 
-                # Clean up at the end
+            # Clean up at the end
         try:
             if hasattr(self, 'th2'):
                 await self.th2.RemoveFabric(self.dut_node_id)
@@ -292,7 +292,6 @@ class TC_ACL_2_6(MatterBaseTest):
             logging.info("Successfully cleaned up fabrics and controllers")
         except Exception as e:
             logging.warning(f"Error during cleanup: {e}")
-
 
     def steps_TC_ACL_2_6(self) -> list[TestStep]:
         steps = [
@@ -316,6 +315,7 @@ class TC_ACL_2_6(MatterBaseTest):
         await self.internal_test_TC_ACL_2_6(force_legacy_encoding=True)
         self.current_step_index = 0
         await self.internal_test_TC_ACL_2_6(force_legacy_encoding=False)
+
 
 if __name__ == "__main__":
     default_matter_test_main()
