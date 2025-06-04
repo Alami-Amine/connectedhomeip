@@ -1767,7 +1767,10 @@ Protocols::InteractionModel::Status InteractionModelEngine::ValidateCommandCanBe
 
     DataModel::AcceptedCommandEntry acceptedCommandEntry;
 
-    Status status = CheckCommandExistence(request.path, acceptedCommandEntry);
+    Status status = CheckCommandAccess(request, acceptedCommandEntry);
+    VerifyOrReturnValue(status == Status::Success, status);
+
+    status = CheckCommandExistence(request.path, acceptedCommandEntry);
 
     if (status != Status::Success)
     {
@@ -1775,9 +1778,6 @@ Protocols::InteractionModel::Status InteractionModelEngine::ValidateCommandCanBe
                       ChipLogValueMEI(request.path.mCommandId), ChipLogValueMEI(request.path.mClusterId), request.path.mEndpointId);
         return status;
     }
-
-    status = CheckCommandAccess(request, acceptedCommandEntry);
-    VerifyOrReturnValue(status == Status::Success, status);
 
     return CheckCommandFlags(request, acceptedCommandEntry);
 }
