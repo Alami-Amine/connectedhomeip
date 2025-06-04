@@ -776,21 +776,6 @@ DataModel::ActionReturnStatus WriteHandler::CheckWriteAllowed(const Access::Subj
 
     DataModel::AttributeFinder finder(mDataModelProvider);
 
-    std::optional<DataModel::AttributeEntry> attributeEntry = finder.Find(aPath);
-
-    // if path is not valid, return a spec-compliant return code.
-    if (!attributeEntry.has_value())
-    {
-        // Global lists are not in metadata and not writable. Return the correct error code according to the spec
-        Status attributeErrorStatus =
-            IsSupportedGlobalAttributeNotInMetadata(aPath.mAttributeId) ? Status::UnsupportedWrite : Status::UnsupportedAttribute;
-
-        return DataModel::ValidateClusterPath(mDataModelProvider, aPath, attributeErrorStatus);
-    }
-
-    // Allow writes on writable attributes only
-    VerifyOrReturnValue(attributeEntry->GetWritePrivilege().has_value(), Status::UnsupportedWrite);
-
     bool checkAcl = true;
     if (mLastSuccessfullyWrittenPath.has_value())
     {
@@ -822,6 +807,21 @@ DataModel::ActionReturnStatus WriteHandler::CheckWriteAllowed(const Access::Subj
             return err;
         }
     }
+
+    std::optional<DataModel::AttributeEntry> attributeEntry = finder.Find(aPath);
+
+    // if path is not valid, return a spec-compliant return code.
+    if (!attributeEntry.has_value())
+    {
+        // Global lists are not in metadata and not writable. Return the correct error code according to the spec
+        Status attributeErrorStatus =
+            IsSupportedGlobalAttributeNotInMetadata(aPath.mAttributeId) ? Status::UnsupportedWrite : Status::UnsupportedAttribute;
+
+        return DataModel::ValidateClusterPath(mDataModelProvider, aPath, attributeErrorStatus);
+    }
+
+    // Allow writes on writable attributes only
+    VerifyOrReturnValue(attributeEntry->GetWritePrivilege().has_value(), Status::UnsupportedWrite);
 
     // validate that timed write is enforced
     VerifyOrReturnValue(IsTimedWrite() || !attributeEntry->HasFlags(DataModel::AttributeQualityFlags::kTimed),

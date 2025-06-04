@@ -49,6 +49,7 @@
 #       --tests test_TC_ACE_2_3
 # === END CI TEST ARGUMENTS ===
 
+from itertools import islice
 import logging
 from copy import deepcopy
 from enum import Enum, auto
@@ -64,6 +65,14 @@ from chip.testing.matter_testing import (AttributePathLocation, ClusterPathLocat
                                          async_test_body, default_matter_test_main)
 from chip.testing.spec_parsing import XmlCluster
 from chip.tlv import uint
+
+import debugpy
+import os
+if os.environ.get("ENABLE_DEBUGPY") == "1":
+    debugpy.listen(("localhost", 5678))
+    print("Waiting for debugger attach...")
+    debugpy.wait_for_client()
+    print("Debugger attached!")
 
 
 class AccessTestType(Enum):
@@ -300,10 +309,10 @@ class AccessChecker(MatterBaseTest, BasicCompositionTests):
 
             resp = await self.TH2.WriteAttribute(nodeid=self.dut_node_id, attributes=[(endpoint_id, attribute(val))])
             if spec_requires == Clusters.AccessControl.Enums.AccessControlEntryPrivilegeEnum.kUnknownEnumValue:
-                # not writeable - expect an unsupported write response
-                if resp[0].Status != Status.UnsupportedWrite:
+                # not writeable - expect either an unsupported write response or an unsupported access response (since ACL privilege check happens before writable check)
+                if (resp[0].Status != Status.UnsupportedWrite and resp[0].Status != Status.UnsupportedAccess):
                     self.record_error(test_name=test_name, location=location,
-                                      problem=f"Unexpected error writing non-writeable attribute - expected Unsupported Write, got {resp[0].Status}")
+                                      problem=f"Unexpected error writing non-writeable attribute - expected either Unsupported Access or UnsupportedWrite, got {resp[0].Status.name}")
                     self.success = False
             elif is_optional_write and resp[0].Status == Status.UnsupportedWrite:
                 # unsupported optional writeable attribute - this is fine, no error
@@ -321,7 +330,7 @@ class AccessChecker(MatterBaseTest, BasicCompositionTests):
             else:
                 if resp[0].Status != Status.UnsupportedAccess:
                     self.record_error(test_name=test_name, location=location,
-                                      problem=f"Unexpected error writing attribute - expected Unsupported Access, got {resp[0].Status}")
+                                      problem=f"Unexpected error writing attribute - expected Unsupported Access, got {resp[0].Status.name}")
                     self.success = False
 
             if resp[0].Status == Status.Success and isinstance(val, list):
