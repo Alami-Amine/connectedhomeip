@@ -1768,8 +1768,15 @@ Protocols::InteractionModel::Status InteractionModelEngine::ValidateCommandCanBe
     DataModel::AcceptedCommandEntry acceptedCommandEntry;
 
     Status status = CheckCommandAccess(request, acceptedCommandEntry);
-    VerifyOrReturnValue(status == Status::Success, status);
 
+    ChipLogDetail(DataManagement,
+                  "AMINE: CheckCommandAccess =  %u"
+                  "No command " ChipLogFormatMEI " in Cluster " ChipLogFormatMEI " on Endpoint %u",
+                  static_cast<int>(status), ChipLogValueMEI(request.path.mCommandId), ChipLogValueMEI(request.path.mClusterId),
+                  request.path.mEndpointId);
+
+    VerifyOrReturnValue(status == Status::Success, status);
+    // TODO make sure CheckCommandAccess prints that "Access was denied"
     status = CheckCommandExistence(request.path, acceptedCommandEntry);
 
     if (status != Status::Success)

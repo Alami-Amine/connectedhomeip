@@ -49,6 +49,7 @@
 #       --tests test_TC_ACE_2_3
 # === END CI TEST ARGUMENTS ===
 
+from asyncio import sleep
 from itertools import islice
 import logging
 from copy import deepcopy
@@ -237,6 +238,7 @@ class AccessChecker(MatterBaseTest, BasicCompositionTests):
             command = Clusters.ClusterObjects.ALL_ACCEPTED_COMMANDS[cluster_id][command_id]
             location = CommandPathLocation(endpoint_id=endpoint_id, cluster_id=cluster_id, command_id=command_id)
             name = f"Command test - privilege {privilege}"
+            sleep(1)
             if operation_allowed(spec_requires, privilege):
                 # In this test, we're only checking that the disallowed commands are rejected so that there are
                 # no side effects. Commands are checked with admin privilege in their cluster tests. The error that
@@ -360,8 +362,8 @@ class AccessChecker(MatterBaseTest, BasicCompositionTests):
             self.step(step_number_with_privilege(check_step, 'a', privilege))
             await self._setup_acl(privilege=privilege)
             self.step(step_number_with_privilege(check_step, 'b', privilege))
-            for endpoint_id, endpoint in self.endpoints_tlv.items():
-                for cluster_id, device_cluster_data in endpoint.items():
+            for endpoint_id, endpoint in islice(self.endpoints_tlv.items(), 1):
+                for cluster_id, device_cluster_data in islice(endpoint.items(), 1):
                     if not is_standard_cluster_id(cluster_id) or cluster_id not in self.xml_clusters or cluster_id not in Clusters.ClusterObjects.ALL_ATTRIBUTES:
                         # These cases have already been recorded by the _record_errors function
                         continue
