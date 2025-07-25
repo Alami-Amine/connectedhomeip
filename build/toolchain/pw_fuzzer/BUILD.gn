@@ -23,6 +23,21 @@ import("${build_root}/toolchain/gcc_toolchain.gni")
 # This toolchain is downstreamed from pigweed's pw_target_toolchain_host.clang_fuzz
 # it allows us to specifically use googletest for fuzzing (instead of the lighter version of googletest used for unit testing)
 
+my_toolchains = {
+  clang_fuzz = {
+    name = "my_clang_fuzz"
+    forward_variables_from(pw_target_toolchain_host.clang_fuzz, "*", [ "name" ])
+    pw_unit_test_MAIN = "$dir_pw_fuzzer:fuzztest_main"
+    pw_unit_test_BACKEND = "$dir_pw_fuzzer:gtest"
+  }
+}
+
+my_toolchains_list = [ my_toolchains.clang_fuzz ]
+
+generate_toolchains("host_toolchains") {
+  toolchains = my_toolchains_list
+}
+
 gcc_toolchain("chip_pw_fuzztest") {
   forward_variables_from(pw_target_toolchain_host.clang_fuzz, "*", [ "name" ])
 

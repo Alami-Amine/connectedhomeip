@@ -442,7 +442,7 @@ class HostBuilder(GnBuilder):
         elif fuzzing_type == HostFuzzingType.OSS_FUZZ:
             self.extra_gn_options.append('oss_fuzz=true')
         elif fuzzing_type == HostFuzzingType.PW_FUZZTEST:
-            self.extra_gn_options.append('pw_enable_fuzz_test_targets=true')
+            self.extra_gn_options.append('pw_enable_fuzz_test_targetsv2=true')
 
         if imgui_ui:
             self.extra_gn_options.append('chip_examples_enable_imgui_ui=true')
@@ -549,7 +549,7 @@ class HostBuilder(GnBuilder):
             self.build_command = 'fuzz_tests'
 
         if self.app == HostApp.TESTS and fuzzing_type == HostFuzzingType.PW_FUZZTEST:
-            self.build_command = 'pw_fuzz_tests'
+            self.build_command = 'pw_fuzz_testsv2'
 
         if self.app == HostApp.TESTS and use_googletest:
             self.extra_gn_options.append('import("//build_overrides/pigweed.gni")')

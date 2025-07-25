@@ -28,6 +28,7 @@ declare_args() {
 
   #Fuzz testing using pw_fuzzer and FuzzTest Framework
   pw_enable_fuzz_test_targets = false
+  pw_enable_fuzz_test_targetsv2 = false
 }
 
 # Define a fuzz target for chip.
