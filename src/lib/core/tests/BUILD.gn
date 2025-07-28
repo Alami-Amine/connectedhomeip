@@ -18,6 +18,9 @@ import("//build_overrides/chip.gni")
 import("${chip_root}/build/chip/chip_test_suite.gni")
 import("${chip_root}/build/chip/fuzz_test.gni")
 
+import("$dir_pw_fuzzer/fuzz_test.gni")
+import("$dir_pw_fuzzer/fuzzer.gni")
+
 chip_test_suite("tests") {
   output_name = "libCoreTests"
 
@@ -63,24 +66,31 @@ if (pw_enable_fuzz_test_targets) {
       "${chip_root}/src/platform/logging:default",
     ]
   }
+}
 
-  # if (pw_enable_fuzz_test_targetsv2) {
-  #   chip_pw_fuzz_target("fuzz-tlv-reader-pw") {
-  #     test_source = [ "FuzzTlvReaderPW.cpp" ]
-  #     public_deps = [
-  #       "${chip_root}/src/lib/core",
-  #       "${chip_root}/src/platform/logging:default",
-  #     ]
-  #   }
-  # }
+# if (pw_enable_fuzz_test_targetsv2) {
+#   chip_pw_fuzz_target("fuzz-tlv-reader-pw") {
+#     test_source = [ "FuzzTlvReaderPW.cpp" ]
+#     public_deps = [
+#       "${chip_root}/src/lib/core",
+#       "${chip_root}/src/platform/logging:default",
+#     ]
+#   }
+# }
 
-  if (pw_enable_fuzz_test_targetsv2) {
-    chip_pw_fuzz_target("fuzz-tlv-reader-pwv2") {
-      test_source = [ "FuzzTlvReaderPW.cpp" ]
-      public_deps = [
-        "${chip_root}/src/lib/core",
-        "${chip_root}/src/platform/logging:default",
-      ]
-    }
+# TODO: this works, but also using above one works
+if (pw_enable_fuzz_test_targetsv2) {
+  pw_fuzz_test("fuzz-tlv-reader-pwv2") {
+    sources = [ "FuzzTlvReaderPW.cpp" ]
+    public_deps = [
+      "${chip_root}/src/lib/core",
+      "${chip_root}/src/platform/logging:default",
+    ]
+
+    remove_configs = [
+      "$dir_pw_build:extra_strict_warnings",
+      "$dir_pw_build:clang_thread_safety_warnings",
+      "$dir_pw_build:internal_strict_warnings",
+    ]
   }
 }

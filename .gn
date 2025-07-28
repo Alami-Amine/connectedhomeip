@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import("//build_overrides/build.gni")
+import("//build_overrides/googletest.gni")
 import("//build_overrides/pigweed.gni")
 
 # The location of the build configuration file.
@@ -43,4 +44,8 @@ default_args = {
     "$dir_pw_assert:impl",
     "$dir_pw_log:impl",
   ]
+
+  dir_pw_third_party_abseil_cpp = "//third_party/abseil-cpp/src"
+  dir_pw_third_party_fuzztest = "//third_party/fuzztest"
+  dir_pw_third_party_googletest = "$dir_googletest"
 }

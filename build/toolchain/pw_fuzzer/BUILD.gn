@@ -29,6 +29,41 @@ my_toolchains = {
     forward_variables_from(pw_target_toolchain_host.clang_fuzz, "*", [ "name" ])
     pw_unit_test_MAIN = "$dir_pw_fuzzer:fuzztest_main"
     pw_unit_test_BACKEND = "$dir_pw_fuzzer:gtest"
+
+    # dir_pw_third_party_fuzztest = "//third_party/fuzztest"
+    # dir_pw_third_party_googletest = "$dir_googletest"
+
+    # forward_variables_from(defaults, "*")
+
+    # remove_default_configs = [
+    #   "$dir_pw_build:extra_strict_warnings",
+    #   "$dir_pw_build:clang_thread_safety_warnings",
+    #   "$dir_pw_build:internal_strict_warnings",
+    # ]
+    # treat_warnings_as_errors = false
+
+    remove_default_configs = [
+      "$dir_pw_toolchain/host_clang:linux_sysroot",
+      "$dir_pw_build:strict_warnings",
+      "$dir_pw_build:optimize_speed",
+      "$dir_pw_build:extra_strict_warnings",
+      "$dir_pw_build:clang_thread_safety_warnings",
+      "$dir_pw_build:internal_strict_warnings",
+    ]
+
+    toolchain_args = {
+      forward_variables_from(defaults, "*")
+
+      # remove_default_configs = [
+      #   "$dir_pw_toolchain/host_clang:linux_sysroot",
+      #   "$dir_pw_build:optimize_speed",
+      #   "$dir_pw_build:strict_warnings",
+      #   "$dir_pw_build:extra_strict_warnings",
+      # ]
+
+      # the third_party abseil-cpp triggers warnings related to [-Wformat-nonliteral]
+      treat_warnings_as_errors = false
+    }
   }
 }
 
@@ -38,48 +73,48 @@ generate_toolchains("host_toolchains") {
   toolchains = my_toolchains_list
 }
 
-gcc_toolchain("chip_pw_fuzztest") {
-  forward_variables_from(pw_target_toolchain_host.clang_fuzz, "*", [ "name" ])
+# gcc_toolchain("chip_pw_fuzztest") {
+#   forward_variables_from(pw_target_toolchain_host.clang_fuzz, "*", [ "name" ])
 
-  toolchain_args = {
-    # This is needed to have the defaults passed from pw_target_toolchain_host.clang_fuzz to the current scope
-    forward_variables_from(defaults, "*")
+#   toolchain_args = {
+#     # This is needed to have the defaults passed from pw_target_toolchain_host.clang_fuzz to the current scope
+#     forward_variables_from(defaults, "*")
 
-    pw_unit_test_MAIN = "$dir_pw_fuzzer:fuzztest_main"
-    pw_unit_test_BACKEND = "$dir_pw_fuzzer:gtest"
+#     pw_unit_test_MAIN = "$dir_pw_fuzzer:fuzztest_main"
+#     pw_unit_test_BACKEND = "$dir_pw_fuzzer:gtest"
 
-    # The next three lines are needed by the gcc_toolchain template
-    current_os = host_os
-    current_cpu = host_cpu
-    is_clang = true
+#     # The next three lines are needed by the gcc_toolchain template
+#     current_os = host_os
+#     current_cpu = host_cpu
+#     is_clang = true
 
-    # the upstream pigweed host_clang toolchain defines a default sysroot, which results in build errors
-    # since it does not include SSL lib and is supposed to be minimal by design.
-    # by removing this default config, we will use the system's libs. Otherwise we can define our own sysroot.
-    # discussion on: https://discord.com/channels/691686718377558037/1275092695764959232
-    remove_default_configs = [ "$dir_pw_toolchain/host_clang:linux_sysroot" ]
+#     # the upstream pigweed host_clang toolchain defines a default sysroot, which results in build errors
+#     # since it does not include SSL lib and is supposed to be minimal by design.
+#     # by removing this default config, we will use the system's libs. Otherwise we can define our own sysroot.
+#     # discussion on: https://discord.com/channels/691686718377558037/1275092695764959232
+#     remove_default_configs = [ "$dir_pw_toolchain/host_clang:linux_sysroot" ]
 
-    # when is_debug = true, we pass -O0 to cflags and ldflags, while upstream pw_fuzzer toolchain defines "optimize_speed" config that passes -O2.
-    # This condition was added to prevent mixing the flags
-    if (is_debug) {
-      remove_default_configs += [ "$dir_pw_build:optimize_speed" ]
-    }
+#     # when is_debug = true, we pass -O0 to cflags and ldflags, while upstream pw_fuzzer toolchain defines "optimize_speed" config that passes -O2.
+#     # This condition was added to prevent mixing the flags
+#     if (is_debug) {
+#       remove_default_configs += [ "$dir_pw_build:optimize_speed" ]
+#     }
 
-    # removing pigweed downstreamed configs related to warnings
-    # These are triggering an error related to -Wcast-qual in third_party/nlio
-    remove_default_configs += [
-      "$dir_pw_build:strict_warnings",
-      "$dir_pw_build:extra_strict_warnings",
-    ]
+#     # removing pigweed downstreamed configs related to warnings
+#     # These are triggering an error related to -Wcast-qual in third_party/nlio
+#     remove_default_configs += [
+#       "$dir_pw_build:strict_warnings",
+#       "$dir_pw_build:extra_strict_warnings",
+#     ]
 
-    # the third_party abseil-cpp triggers warnings related to [-Wformat-nonliteral]
-    treat_warnings_as_errors = false
+#     # the third_party abseil-cpp triggers warnings related to [-Wformat-nonliteral]
+#     treat_warnings_as_errors = false
 
-    dir_pw_third_party_abseil_cpp = "//third_party/abseil-cpp/src"
-    dir_pw_third_party_fuzztest = "//third_party/fuzztest"
-    dir_pw_third_party_googletest = "$dir_googletest"
+#     dir_pw_third_party_abseil_cpp = "//third_party/abseil-cpp/src"
+#     dir_pw_third_party_fuzztest = "//third_party/fuzztest"
+#     dir_pw_third_party_googletest = "$dir_googletest"
 
-    # Since pw_fuzzer uses GoogleTest, activating this allows us to benefit from supporting functions
-    chip_build_tests_googletest = true
-  }
-}
+#     # Since pw_fuzzer uses GoogleTest, activating this allows us to benefit from supporting functions
+#     chip_build_tests_googletest = true
+#   }
+# }
