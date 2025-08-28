@@ -172,6 +172,8 @@ private:
     void FreeResolveContext(size_t handle);
     void FreeResolveContext(const char * name);
 
+    void FreeRemainingResolveContexts();
+
     static void HandleClientState(AvahiClient * client, AvahiClientState state, void * context);
     void HandleClientState(AvahiClient * client, AvahiClientState state);
 

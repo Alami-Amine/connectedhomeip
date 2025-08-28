@@ -5,12 +5,103 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python Debugger: Current File with Arguments",
+            "name": "Debug Python Test run_python_test.py",
             "type": "debugpy",
             "request": "launch",
-            "program": "${file}",
+            "program": "${workspaceFolder}/scripts/tests/run_python_test.py",
+            "args": [
+                "--factory-reset",
+                "--script",
+                "src/python_testing/TC_AccessChecker.py",
+                "--script-args",
+                "--commissioning-method on-network -p 20202021 -d 3840 --PICS src/app/tests/suites/certification/ci-pics-values --timeout 180 --bool-arg ci_only_linux_skip_ota_cluster_disallowed_for_certification:True --tests test_TC_ACE_2_3",
+                "--app",
+                "out/linux-x64-all-clusters/chip-all-clusters-app",
+                "--app-args",
+                "--secured-device-port 5571"
+            ],
+            "env": {
+                "ENABLE_DEBUGPY": "1"
+            },
+
             "console": "integratedTerminal",
-            "args": []
+            "justMyCode": false,
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "name": "Attach to Running Process (GDB)",
+            "type": "cppdbg",
+            "request": "attach",
+            "processId": "${command:pickProcess}",
+            "program": "${workspaceFolder}/out/linux-x64-all-clusters/chip-all-clusters-app", // <-- required
+            "MIMode": "gdb",
+            "miDebuggerPath": "/usr/bin/gdb", // Adjust if your gdb is elsewhere
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ]
+        },
+        {
+            "name": "Attach to TC_AccessChecker.py",
+            "type": "debugpy",
+            "request": "attach",
+            "connect": {
+                "host": "localhost",
+                "port": 5678
+            },
+            "justMyCode": false
+        },
+        {
+            "type": "midas-rr",
+            "request": "attach",
+            "name": "Launch replay debug session",
+            "cwd": "${workspaceFolder}",
+            "trace": "Off",
+            "gdbPath": "gdb",
+            "rrPath": "/usr/bin/rr",
+            "setupCommands": [
+                "set sysroot /",
+                "set debuginfod enabled off",
+                "set auto-load safe-path /"
+            ],
+            "ignoreStandardLibrary": true
+        },
+        {
+            "type": "midas-gdb",
+            "request": "launch",
+            "name": "Launch Debug",
+            "program": "/path/to/binary",
+            "cwd": "${workspaceFolder}",
+            "stopOnEntry": true,
+            "trace": "Off",
+            "gdbPath": "gdb",
+            "noSingleThreadControl": true,
+            "setupCommands": [],
+            "attachOnFork": false,
+            "ignoreStandardLibrary": true
+        },
+        {
+            "name": "RR Replay",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "rr",
+            "args": ["replay"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "miDebuggerPath": "/usr/bin/rr",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ]
         },
         {
             "name": "Python: Mock Server Tests",
@@ -26,6 +117,7 @@
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}"
         },
+
         {
             "name": "Python Debugger: test_dcl_server",
             "type": "debugpy",
@@ -45,12 +137,7 @@
             ],
             "console": "integratedTerminal"
         },
-        {
-            "name": "Attach to running process",
-            "type": "lldb",
-            "request": "attach",
-            "pid": "${command:pickProcess}"
-        },
+
         {
             "name": "Run application (Darwin x64)",
             "type": "lldb",

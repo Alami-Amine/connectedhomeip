@@ -345,8 +345,25 @@ exit:
     return error;
 }
 
+void MdnsAvahi::FreeRemainingResolveContexts()
+{
+    if (!mAllocatedResolves.empty())
+    {
+        ChipLogProgress(DeviceLayer, "Cleaning up %zu remaining ResolveContexts", mAllocatedResolves.size());
+
+        while (!mAllocatedResolves.empty())
+        {
+            auto * context = mAllocatedResolves.front();
+            ChipLogProgress(DeviceLayer, "Freeing orphaned ResolveContext with handle: %zu", context->mNumber);
+            chip::Platform::Delete(context); // destructor handles avahi_service_resolver_free
+            mAllocatedResolves.pop_front();
+        }
+    }
+}
+
 void MdnsAvahi::Shutdown()
 {
+    FreeRemainingResolveContexts();
     StopPublish();
     if (mClient)
     {
@@ -807,6 +824,7 @@ MdnsAvahi::ResolveContext * MdnsAvahi::AllocateResolveContext()
     }
 
     context->mNumber = mResolveCount++;
+    ChipLogProgress(DeviceLayer, "AMINE: Allocated ResolveContext with handle: %zu", context->mNumber);
     mAllocatedResolves.push_back(context);
 
     return context;
@@ -826,15 +844,21 @@ MdnsAvahi::ResolveContext * MdnsAvahi::ResolveContextForHandle(size_t handle)
 
 void MdnsAvahi::FreeResolveContext(size_t handle)
 {
+    ChipLogProgress(DeviceLayer, "AMINE: FreeResolveContext called with handle: %zu", handle);
+    ChipLogProgress(DeviceLayer, "AMINE: mAllocatedResolves size: %zu", mAllocatedResolves.size());
+
     for (auto it = mAllocatedResolves.begin(); it != mAllocatedResolves.end(); it++)
     {
+        ChipLogProgress(DeviceLayer, "AMINE: Checking handle %zu against %zu", (*it)->mNumber, handle);
         if ((*it)->mNumber == handle)
         {
+            ChipLogProgress(DeviceLayer, "AMINE: Found and deleting ResolveContext with handle: %zu", handle);
             chip::Platform::Delete(*it);
             mAllocatedResolves.erase(it);
             return;
         }
     }
+    ChipLogError(DeviceLayer, "AMINE: ResolveContext with handle %zu NOT FOUND!", handle);
 }
 
 void MdnsAvahi::StopResolve(const char * name)
@@ -913,7 +937,7 @@ void MdnsAvahi::HandleResolve(AvahiServiceResolver * resolver, AvahiIfIndex inte
         if (context->mAttempts++ < 3)
         {
             ChipLogProgress(DeviceLayer, "Re-trying resolve");
-            avahi_service_resolver_free(resolver);
+            avahi_service_resolver_free(context->mResolver);
             context->mResolver = avahi_service_resolver_new(
                 context->mInstance->mClient, context->mInterface, context->mTransport, context->mName, context->mFullType.c_str(),
                 nullptr, context->mAddressType, static_cast<AvahiLookupFlags>(0), HandleResolve, userdata);
