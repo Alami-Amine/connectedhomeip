@@ -57,10 +57,13 @@ void AbstractDnssdDiscoveryController::OnNodeDiscovered(const chip::Dnssd::Disco
     VerifyOrReturn(discNodeData.Is<chip::Dnssd::CommissionNodeData>());
 
     auto discoveredNodes = GetDiscoveredNodes();
-    auto & nodeData      = discNodeData.Get<chip::Dnssd::CommissionNodeData>();
+    ChipLogError(Discovery, "AMINE: the size of discoveredNodes is %zu", discoveredNodes.size());
+
+    auto & nodeData = discNodeData.Get<chip::Dnssd::CommissionNodeData>();
     for (auto & discoveredNode : discoveredNodes)
     {
 
+        ChipLogError(Discovery, "AMINE: 1st for (auto & discoveredNode : discoveredNodes)");
         if (!discoveredNode.IsValid())
         {
             continue;
@@ -70,6 +73,8 @@ void AbstractDnssdDiscoveryController::OnNodeDiscovered(const chip::Dnssd::Disco
         if (strcmp(discoveredNode.hostName, nodeData.hostName) == 0 && discoveredNode.port == nodeData.port &&
             SameExceptOrder(discoveredNodeIPAddressSpan, nodeDataIPAddressSpan))
         {
+            ChipLogError(Discovery, "AMINE: inside the if (strcmp(discoveredNode.hostName, nodeData.hostName) == 0 && ...)");
+
             discoveredNode = nodeData;
             if (mDeviceDiscoveryDelegate != nullptr)
             {
@@ -81,8 +86,11 @@ void AbstractDnssdDiscoveryController::OnNodeDiscovered(const chip::Dnssd::Disco
     // Node not yet in the list
     for (auto & discoveredNode : discoveredNodes)
     {
+        ChipLogError(Discovery, "AMINE: 2nd for (auto & discoveredNode : discoveredNodes)");
         if (!discoveredNode.IsValid())
         {
+            ChipLogError(Discovery, "AMINE: inside the  if (!discoveredNode.IsValid())");
+
             discoveredNode = nodeData;
             if (mDeviceDiscoveryDelegate != nullptr)
             {
