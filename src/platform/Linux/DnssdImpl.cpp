@@ -743,7 +743,39 @@ void MdnsAvahi::HandleBrowse(AvahiServiceBrowser * browser, AvahiIfIndex interfa
                 service.mInterface = static_cast<chip::Inet::InterfaceId>(interface);
             }
             service.mType[kDnssdTypeMaxSize] = 0;
-            context->mServices.push_back(service);
+
+            // Check if this service already exists in mServices
+            // If it does, we don't add it again.
+            // This is done to avoid creating duplicate resolvers for the same service.
+            // Avahi ends up only calling Resolve Callback once per unique service.
+            ChipLogError(DeviceLayer, " HAndleBROWSE: service %s found using browse, it has transporttype %s", name,
+                         protocol == AVAHI_PROTO_INET6 ? "IPv6" : "IPv4") bool alreadyExists = false;
+            for (auto & existing : context->mServices)
+            {
+                if (strcmp(existing.mName, service.mName) == 0 && strcmp(existing.mType, service.mType) == 0 &&
+                    existing.mProtocol == service.mProtocol)
+                {
+                    alreadyExists = true;
+                    ChipLogDetail(DeviceLayer, " service %s alreadyExistsn it has %s with TrasnportType: %s", name,
+                                  protocol == AVAHI_PROTO_INET6 ? "IPv6" : "IPv4",
+                                  existing.mTransportType == Inet::IPAddressType::kIPv6 ? "IPv6" : "IPv4");
+
+                    // Optional: Update to prefer IPv6 over IPv4
+                    if (protocol == AVAHI_PROTO_INET6 && existing.mTransportType == Inet::IPAddressType::kIPv4)
+                    {
+                        ChipLogDetail(DeviceLayer, "Updating service %s to use IPv6", name);
+                        existing.mTransportType = service.mTransportType;
+                        existing.mInterface     = service.mInterface;
+                    }
+                    break;
+                }
+            }
+
+            if (!alreadyExists)
+            {
+                context->mServices.push_back(service);
+                ChipLogDetail(DeviceLayer, "Added new service: %s", name);
+            }
             if (context->mReceivedAllCached)
             {
                 InvokeDelegateOrCleanUp(context, browser);
@@ -969,6 +1001,7 @@ void MdnsAvahi::HandleResolve(AvahiServiceResolver * resolver, AvahiIfIndex inte
 #else
                 ChipLogError(Discovery, "Ignoring IPv4 mDNS address.");
 #endif
+                ChipLogError(Discovery, "the Address is IPv4");
                 break;
             case AVAHI_PROTO_INET6:
                 struct in6_addr addr6;
@@ -976,6 +1009,8 @@ void MdnsAvahi::HandleResolve(AvahiServiceResolver * resolver, AvahiIfIndex inte
                 memcpy(&addr6, &(address->data.ipv6), sizeof(addr6));
                 ipAddress  = chip::Inet::IPAddress(addr6);
                 result_err = CHIP_NO_ERROR;
+                ChipLogError(Discovery, "the Address is IPv6");
+
                 break;
             default:
                 break;
