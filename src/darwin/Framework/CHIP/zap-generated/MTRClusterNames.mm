@@ -195,6 +195,9 @@ NSString * MTRClusterNameForID(MTRClusterIDType clusterID)
     case MTRClusterIDTypeScenesManagementID:
         result = @"ScenesManagement";
         break;
+    case MTRClusterIDTypeGroupcastID:
+        result = @"Groupcast";
+        break;
     case MTRClusterIDTypeHEPAFilterMonitoringID:
         result = @"HEPAFilterMonitoring";
         break;
@@ -3748,6 +3751,46 @@ NSString * MTRAttributeNameForID(MTRClusterIDType clusterID, MTRAttributeIDType 
         }
         break;
 
+    case MTRClusterIDTypeGroupcastID:
+
+        switch (attributeID) {
+
+            // Cluster Groupcast attributes
+        case MTRAttributeIDTypeClusterGroupcastAttributeMembershipID:
+            result = @"Membership";
+            break;
+
+        case MTRAttributeIDTypeClusterGroupcastAttributeMaxMembershipCountID:
+            result = @"MaxMembershipCount";
+            break;
+
+        case MTRAttributeIDTypeClusterGroupcastAttributeGeneratedCommandListID:
+            result = @"GeneratedCommandList";
+            break;
+
+        case MTRAttributeIDTypeClusterGroupcastAttributeAcceptedCommandListID:
+            result = @"AcceptedCommandList";
+            break;
+
+        case MTRAttributeIDTypeClusterGroupcastAttributeAttributeListID:
+            result = @"AttributeList";
+            break;
+
+        case MTRAttributeIDTypeClusterGroupcastAttributeFeatureMapID:
+            result = @"FeatureMap";
+            break;
+
+        case MTRAttributeIDTypeClusterGroupcastAttributeClusterRevisionID:
+            result = @"ClusterRevision";
+            break;
+
+        default:
+            // Not a known Groupcast attribute.
+            result = [NSString stringWithFormat:@"<Unknown attributeID %u>", attributeID];
+            break;
+        }
+        break;
+
     case MTRClusterIDTypeHEPAFilterMonitoringID:
 
         switch (attributeID) {
@@ -4559,6 +4602,10 @@ NSString * MTRAttributeNameForID(MTRClusterIDType clusterID, MTRAttributeIDType 
 
         case MTRAttributeIDTypeClusterPowerTopologyAttributeActiveEndpointsID:
             result = @"ActiveEndpoints";
+            break;
+
+        case MTRAttributeIDTypeClusterPowerTopologyAttributeElectricalCircuitNodesID:
+            result = @"ElectricalCircuitNodes";
             break;
 
         case MTRAttributeIDTypeClusterPowerTopologyAttributeGeneratedCommandListID:
@@ -10508,6 +10555,36 @@ NSString * MTRRequestCommandNameForID(MTRClusterIDType clusterID, MTRCommandIDTy
         }
         break;
 
+    case MTRClusterIDTypeGroupcastID:
+
+        switch (commandID) {
+
+        case MTRCommandIDTypeClusterGroupcastCommandJoinGroupID:
+            result = @"JoinGroup";
+            break;
+
+        case MTRCommandIDTypeClusterGroupcastCommandLeaveGroupID:
+            result = @"LeaveGroup";
+            break;
+
+        case MTRCommandIDTypeClusterGroupcastCommandUpdateGroupKeyID:
+            result = @"UpdateGroupKey";
+            break;
+
+        case MTRCommandIDTypeClusterGroupcastCommandExpireGracePeriodID:
+            result = @"ExpireGracePeriod";
+            break;
+
+        case MTRCommandIDTypeClusterGroupcastCommandConfigureAuxiliaryACLID:
+            result = @"ConfigureAuxiliaryACL";
+            break;
+
+        default:
+            result = [NSString stringWithFormat:@"<Unknown commandID %u>", commandID];
+            break;
+        }
+        break;
+
     case MTRClusterIDTypeHEPAFilterMonitoringID:
 
         switch (commandID) {
@@ -12140,8 +12217,8 @@ NSString * MTRRequestCommandNameForID(MTRClusterIDType clusterID, MTRCommandIDTy
             result = @"RemoveRootCertificate";
             break;
 
-        case MTRCommandIDTypeClusterTLSCertificateManagementCommandTLSClientCSRID:
-            result = @"TLSClientCSR";
+        case MTRCommandIDTypeClusterTLSCertificateManagementCommandClientCSRID:
+            result = @"ClientCSR";
             break;
 
         case MTRCommandIDTypeClusterTLSCertificateManagementCommandProvisionClientCertificateID:
@@ -13098,6 +13175,20 @@ NSString * MTRResponseCommandNameForID(MTRClusterIDType clusterID, MTRCommandIDT
         }
         break;
 
+    case MTRClusterIDTypeGroupcastID:
+
+        switch (commandID) {
+
+        case MTRCommandIDTypeClusterGroupcastCommandLeaveGroupResponseID:
+            result = @"LeaveGroupResponse";
+            break;
+
+        default:
+            result = [NSString stringWithFormat:@"<Unknown commandID %u>", commandID];
+            break;
+        }
+        break;
+
     case MTRClusterIDTypeHEPAFilterMonitoringID:
 
         switch (commandID) {
@@ -14034,8 +14125,8 @@ NSString * MTRResponseCommandNameForID(MTRClusterIDType clusterID, MTRCommandIDT
             result = @"LookupRootCertificateResponse";
             break;
 
-        case MTRCommandIDTypeClusterTLSCertificateManagementCommandTLSClientCSRResponseID:
-            result = @"TLSClientCSRResponse";
+        case MTRCommandIDTypeClusterTLSCertificateManagementCommandClientCSRResponseID:
+            result = @"ClientCSRResponse";
             break;
 
         case MTRCommandIDTypeClusterTLSCertificateManagementCommandFindClientCertificateResponseID:
@@ -15012,6 +15103,16 @@ NSString * MTREventNameForID(MTRClusterIDType clusterID, MTREventIDType eventID)
         break;
 
     case MTRClusterIDTypeScenesManagementID:
+
+        switch (eventID) {
+
+        default:
+            result = [NSString stringWithFormat:@"<Unknown eventID %u>", eventID];
+            break;
+        }
+        break;
+
+    case MTRClusterIDTypeGroupcastID:
 
         switch (eventID) {
 
