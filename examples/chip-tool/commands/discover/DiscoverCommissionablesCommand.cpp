@@ -33,12 +33,12 @@ void DiscoverCommissionablesCommandBase::OnDiscoveredDevice(const Dnssd::Commiss
     nodeData.LogDetail();
     LogErrorOnFailure(RemoteDataModelLogger::LogDiscoveredNodeData(nodeData));
 
-    if (mDiscoverOnce.ValueOr(true))
-    {
-        mCommissioner->RegisterDeviceDiscoveryDelegate(nullptr);
-        auto err = mCommissioner->StopCommissionableDiscovery();
-        SetCommandExitStatus(err);
-    }
+    // if (mDiscoverOnce.ValueOr(true))
+    // {
+    //     mCommissioner->RegisterDeviceDiscoveryDelegate(nullptr);
+    //     auto err = mCommissioner->StopCommissionableDiscovery();
+    //     SetCommandExitStatus(err);
+    // }
 }
 
 CHIP_ERROR DiscoverCommissionablesStartCommand::RunCommand()
