@@ -74,12 +74,17 @@ void AbstractDnssdDiscoveryController::OnNodeDiscovered(const chip::Dnssd::Disco
             SameExceptOrder(discoveredNodeIPAddressSpan, nodeDataIPAddressSpan))
         {
             ChipLogError(Discovery, "AMINE: inside the if (strcmp(discoveredNode.hostName, nodeData.hostName) == 0 && ...)");
-
+            ChipLogError(Discovery, "AMINE: This node is already ");
+            // TODO this line directly below, seems useless?
+            // Nope, I am wrong, it is needed and removing it triggers
+            // failure in TestCommissionableNodeController.TestGetDiscoveredCommissioner_MultipleIPAddressDiscover
             discoveredNode = nodeData;
-            if (mDeviceDiscoveryDelegate != nullptr)
-            {
-                mDeviceDiscoveryDelegate->OnDiscoveredDevice(nodeData);
-            }
+
+            // TODO: trying to remove the call for this delegate, because it seems to be not needed?
+            //  if (mDeviceDiscoveryDelegate != nullptr)
+            //  {
+            //      mDeviceDiscoveryDelegate->OnDiscoveredDevice(nodeData);
+            //  }
             return;
         }
     }
