@@ -36,6 +36,7 @@
 # === END CI TEST ARGUMENTS ===
 
 
+import asyncio
 from mobly import asserts
 
 import matter.clusters as Clusters
@@ -132,6 +133,69 @@ class TestRevokeCommissioningClearsPASE(MatterBaseTest):
                 attributes=(ROOT_NODE_ENDPOINT_ID, VendorNameAttr))
         asserts.assert_equal(e.exception.err, _CHIP_TIMEOUT_ERROR,
                              f"Expected timeout error reading VendorName attribute over PASE, got {e.exception.err}")
+
+        # ---------------------------- Test that Revoke Commissioning sent during Asynchronous Command Processing does not cause crash --------------------------------
+
+        self.print_step(11, "recreate Second Controller; to establish a new PASE session and test that sending RevokeCommissioning during an async command processing causes device to fail to send InvokeResponseMessage and NOT crash")
+
+        self.TH2.Shutdown()
+        fabric_admin = self.certificate_authority_manager.activeCaList[0].adminList[0]
+        self.TH2_nodeId = self.matter_test_config.controller_node_id + 1
+        self.TH2 = fabric_admin.NewController(
+            nodeId=self.TH2_nodeId,
+            paaTrustStorePath=str(self.matter_test_config.paa_trust_store_path),
+        )
+
+        self.print_step(12, "TH1 sends an OpenCommissioningWindow command to DUT to allow it to be commissioned by TH2")
+        resp = await self.open_commissioning_window()
+
+        self.print_step(13, "TH2 establishes a PASE session with DUT")
+        pase_node_id = self.dut_node_id + 1
+        await self.TH2.FindOrEstablishPASESession(setupCode=resp.commissioningParameters.setupQRCode, nodeId=pase_node_id)
+
+        self.print_step(14, "Read VendorName from BasicInformation Cluster using TH2 over PASE, to ensure PASE session is established")
+        VendorNameAttr = Clusters.BasicInformation.Attributes.VendorName
+        ROOT_NODE_ENDPOINT_ID = 0
+
+        read_step3 = await self.TH2.ReadAttribute(
+            nodeId=pase_node_id,
+            attributes=(ROOT_NODE_ENDPOINT_ID, VendorNameAttr),
+        )
+
+        asserts.assert_in(
+            VendorNameAttr,
+            read_step3[ROOT_NODE_ENDPOINT_ID][Clusters.BasicInformation],
+            "VendorName should be present in the read response"
+        )
+
+        self.print_step(15, "TH2 invokes Async Command over PASE")
+
+        response_size = 7
+        request_1_fill_character = b"a"
+
+        command = Clusters.UnitTesting.Commands.TestBatchHelperRequest(
+            sleepBeforeResponseTimeMs=1000, sizeOfResponseBuffer=response_size, fillCharacter=ord(request_1_fill_character))
+
+        # Send the async command but do not await it yet
+        send_async_command_task = asyncio.create_task(
+            self.TH2.SendCommand(
+                nodeId=pase_node_id,
+                endpoint=1,
+                payload=command
+            )
+        )
+
+        self.print_step(16, "TH1 Sends RevokeCommissioning over CASE BEFORE the async command responds")
+        revokeCmd = Clusters.AdministratorCommissioning.Commands.RevokeCommissioning()
+        await self.TH1.SendCommand(nodeId=self.dut_node_id, endpoint=0, payload=revokeCmd, timedRequestTimeoutMs=6000)
+
+        # TODO: Am I sure that if DUT crashes i will see it in my Test?
+        # TODO: try to trigger a crash and see if it shows up in the test.....it is VERY likely that it will not be detected though...
+        # Assert that the command failed to respond, rather than the DUT crashing
+        with asserts.assert_raises(ChipStackError) as e:
+            await send_async_command_task
+        asserts.assert_equal(e.exception.err, _CHIP_TIMEOUT_ERROR,
+                             f"Expected timeout error for receiving a reply of the async command over PASE, got {e.exception.err}")
 
 
 if __name__ == "__main__":
