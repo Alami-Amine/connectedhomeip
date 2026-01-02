@@ -24,9 +24,9 @@
 #include <app/EventManagement.h>
 #include <app/InteractionModelEngine.h>
 #include <app/MessageDef/CommandDataIB.h>
-#include <app/clusters/push-av-stream-transport-server/push-av-stream-transport-cluster.h>
-#include <app/clusters/testing/MockCommandHandler.h>
-#include <app/clusters/tls-client-management-server/tls-client-management-server.h>
+#include <app/clusters/push-av-stream-transport-server/PushAVStreamTransportCluster.h>
+#include <app/clusters/tls-client-management-server/TlsClientManagementCluster.h>
+#include <app/server-cluster/testing/MockCommandHandler.h>
 #include <app/tests/AppTestContext.h>
 #include <lib/core/Optional.h>
 #include <lib/core/StringBuilderAdapters.h>
@@ -36,6 +36,7 @@
 #include <lib/support/CodeUtils.h>
 #include <lib/support/ScopedBuffer.h>
 #include <lib/support/Span.h>
+#include <lib/support/tests/ExtraPwTestMacros.h>
 #include <messaging/ExchangeContext.h>
 
 namespace chip {
@@ -78,7 +79,7 @@ static uint8_t gInfoEventBuffer[120];
 static uint8_t gCritEventBuffer[120];
 static chip::app::CircularEventBuffer gCircularEventBuffer[3];
 
-class MockEventLogging : public chip::Test::AppContext
+class MockEventLogging : public chip::Testing::AppContext
 {
 public:
     void SetUp() override
@@ -764,7 +765,7 @@ TEST_F(TestPushAVStreamTransportServerLogic, Test_AllocateTransport_AllocateTran
     tlvWriter.Init(buf);
 
     AttributeReportIBs::Builder builder;
-    builder.Init(&tlvWriter);
+    EXPECT_SUCCESS(builder.Init(&tlvWriter));
 
     ConcreteAttributePath path(1, Clusters::PushAvStreamTransport::Id,
                                Clusters::PushAvStreamTransport::Attributes::CurrentConnections::Id);
@@ -791,20 +792,20 @@ TEST_F(TestPushAVStreamTransportServerLogic, Test_AllocateTransport_AllocateTran
     TLV::TLVReader attrReportReader;
     TLV::TLVReader attrDataReader;
 
-    reader.Next();
-    reader.OpenContainer(attrReportsReader);
+    EXPECT_SUCCESS(reader.Next());
+    EXPECT_SUCCESS(reader.OpenContainer(attrReportsReader));
 
-    attrReportsReader.Next();
-    attrReportsReader.OpenContainer(attrReportReader);
+    EXPECT_SUCCESS(attrReportsReader.Next());
+    EXPECT_SUCCESS(attrReportsReader.OpenContainer(attrReportReader));
 
-    attrReportReader.Next();
-    attrReportReader.OpenContainer(attrDataReader);
+    EXPECT_SUCCESS(attrReportReader.Next());
+    EXPECT_SUCCESS(attrReportReader.OpenContainer(attrDataReader));
 
     // We're now in the attribute data IB, skip to the desired tag, we want TagNum = 2
-    attrDataReader.Next();
+    EXPECT_SUCCESS(attrDataReader.Next());
     for (int i = 0; i < 3 && !(IsContextTag(attrDataReader.GetTag()) && TagNumFromTag(attrDataReader.GetTag()) == 2); ++i)
     {
-        attrDataReader.Next();
+        EXPECT_SUCCESS(attrDataReader.Next());
     }
     EXPECT_TRUE(IsContextTag(attrDataReader.GetTag()));
     EXPECT_EQ(TagNumFromTag(attrDataReader.GetTag()), 2u);
