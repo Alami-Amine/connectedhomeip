@@ -191,6 +191,8 @@ CHIP_ERROR LocalizationConfigurationCluster::ReadSupportedLocales(AttributeValue
 
 bool LocalizationConfigurationCluster::IsSupportedLocale(CharSpan newLangTag) const
 {
+    ChipLogError(AppServer, "&mDeviceInfoProvider = %p", static_cast<void *>(&mDeviceInfoProvider));
+
     AutoReleaseIterator it(&mDeviceInfoProvider);
     if (!it.IsValid())
     {
