@@ -132,6 +132,8 @@ public:
 
     Optional<SessionHandle> GetPASESession() const { return mPASESession.Get(); }
 
+    bool IsListeningForPASE() const { return mListeningForPASE; }
+
 private:
     //////////// SessionDelegate Implementation ///////////////
     void OnSessionReleased() override;
