@@ -249,8 +249,10 @@ void TestCommissioningWindowManager::ServiceEvents()
 {
     DrainAndServiceIO();
 
-    EXPECT_SUCCESS(chip::DeviceLayer::PlatformMgr().ScheduleWork(
-        [](intptr_t) -> void { EXPECT_SUCCESS(chip::DeviceLayer::PlatformMgr().StopEventLoopTask()); }, (intptr_t) nullptr));
+    EXPECT_SUCCESS(chip::DeviceLayer::SystemLayer().StartTimer(
+        chip::System::Clock::Milliseconds32(0),
+        [](chip::System::Layer *, void *) { EXPECT_SUCCESS(chip::DeviceLayer::PlatformMgr().StopEventLoopTask()); }, nullptr));
+
     chip::DeviceLayer::PlatformMgr().RunEventLoop();
 }
 
