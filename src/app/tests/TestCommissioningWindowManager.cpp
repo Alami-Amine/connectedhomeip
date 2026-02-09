@@ -77,8 +77,7 @@ bool sAdminFabricIndexDirty = false;
 bool sAdminVendorIdDirty    = false;
 bool sWindowStatusDirty     = false;
 
-bool sSimulateFailedSessionEstablishmentTaskCalled          = false;
-bool sCheckCommissioningWindowManagerWindowClosedTaskCalled = false;
+bool sSimulateFailedSessionEstablishmentTaskCalled = false;
 
 void ResetDirtyFlags()
 {
@@ -235,8 +234,6 @@ public:
     {
         ConfigInitializeNodes(false);
         chip::Testing::LoopbackMessagingContext::SetUp();
-        sSimulateFailedSessionEstablishmentTaskCalled          = false;
-        sCheckCommissioningWindowManagerWindowClosedTaskCalled = false;
     }
 
     void EstablishPASEHandshake(SessionManager & sessionManager, PASESession & pairingCommissioner,
@@ -388,7 +385,7 @@ TEST_F(TestCommissioningWindowManager, TestCheckCommissioningWindowManagerBasicW
     ResetDirtyFlags();
 }
 
-void CheckCommissioningWindowManagerWindowClosedTask(chip::System::Layer *, void *)
+void VerifyCommissioningWindowManagerWindowClosed()
 {
     CommissioningWindowManager & commissionMgr = Server::GetInstance().GetCommissioningWindowManager();
     EXPECT_FALSE(commissionMgr.IsCommissioningWindowOpen());
@@ -397,8 +394,6 @@ void CheckCommissioningWindowManagerWindowClosedTask(chip::System::Layer *, void
     EXPECT_FALSE(sWindowStatusDirty);
     EXPECT_FALSE(sAdminFabricIndexDirty);
     EXPECT_FALSE(sAdminVendorIdDirty);
-
-    sCheckCommissioningWindowManagerWindowClosedTaskCalled = true;
 }
 
 TEST_F(TestCommissioningWindowManager, TestCheckCommissioningWindowManagerWindowTimeout)
@@ -430,13 +425,11 @@ TEST_F(TestCommissioningWindowManager, TestCheckCommissioningWindowManagerWindow
     EXPECT_FALSE(sAdminFabricIndexDirty);
     EXPECT_FALSE(sAdminVendorIdDirty);
 
-    EXPECT_SUCCESS(chip::DeviceLayer::SystemLayer().StartTimer(chip::System::Clock::Milliseconds32(kTimeoutMs + kSleepPadding),
-                                                               CheckCommissioningWindowManagerWindowClosedTask, nullptr));
-
+    // Advance time to so that the commissioning window times out
     clock.AdvanceMonotonic(chip::System::Clock::Milliseconds64(kTimeoutMs + kSleepPadding));
     ServiceEvents();
 
-    EXPECT_TRUE(sCheckCommissioningWindowManagerWindowClosedTaskCalled);
+    VerifyCommissioningWindowManagerWindowClosed();
     EXPECT_EQ(delegateApp.mOnCommissioningWindowClosedCount, 1u);
 
     commissionMgr.SetAppDelegate(nullptr);
@@ -472,6 +465,7 @@ TEST_F(TestCommissioningWindowManager, CheckCommissioningWindowManagerWindowTime
     EXPECT_FALSE(sWindowStatusDirty);
     EXPECT_FALSE(sAdminFabricIndexDirty);
     EXPECT_FALSE(sAdminVendorIdDirty);
+    EXPECT_FALSE(sSimulateFailedSessionEstablishmentTaskCalled);
 
     CommissioningWindowManager & commissionMgr = Server::GetInstance().GetCommissioningWindowManager();
     MockAppDelegate delegateApp;
@@ -499,10 +493,8 @@ TEST_F(TestCommissioningWindowManager, CheckCommissioningWindowManagerWindowTime
     EXPECT_EQ(delegateApp.mOnCommissioningWindowClosedCount, 0u);
     EXPECT_EQ(delegateApp.mOnCommissioningSessionEstablishmentErrorCount, 0u);
 
-    EXPECT_SUCCESS(chip::DeviceLayer::SystemLayer().StartTimer(chip::System::Clock::Milliseconds32(kTimeoutMs + kSleepPadding),
-                                                               CheckCommissioningWindowManagerWindowClosedTask, nullptr));
     // Simulate a session establishment error during that window, such that the
-    // delay for the error plus the window size exceeds our "timeout + padding" above.
+    // delay for the error plus the window size exceeds the "timeout + padding" needed to result in Commissioning Window Closing.
     EXPECT_SUCCESS(DeviceLayer::SystemLayer().StartTimer(System::Clock::Milliseconds32(kFailedSessionEstablishmentTimeoutMs),
                                                          SimulateFailedSessionEstablishmentTask, nullptr));
 
@@ -513,11 +505,11 @@ TEST_F(TestCommissioningWindowManager, CheckCommissioningWindowManagerWindowTime
     EXPECT_TRUE(sSimulateFailedSessionEstablishmentTaskCalled);
     EXPECT_EQ(delegateApp.mOnCommissioningSessionEstablishmentErrorCount, 1u);
 
-    // Advance time so that the CheckCommissioningWindowManagerWindowClosedTask is fired
+    // Advance time so that the Commissioning Window times out and closes
     clock.AdvanceMonotonic(chip::System::Clock::Milliseconds64(kTimeoutMs + kSleepPadding - kFailedSessionEstablishmentTimeoutMs));
     ServiceEvents();
 
-    EXPECT_TRUE(sCheckCommissioningWindowManagerWindowClosedTaskCalled);
+    VerifyCommissioningWindowManagerWindowClosed();
     EXPECT_EQ(delegateApp.mOnCommissioningWindowClosedCount, 1u);
 
     commissionMgr.SetAppDelegate(nullptr);
