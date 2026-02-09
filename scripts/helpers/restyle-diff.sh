@@ -41,6 +41,19 @@ restyle-paths() {
     echo "[restyle-diff.sh] Please wait, Restyling files (and Pulling restyler Docker images if needed)"
     restyle --config-file=.restyled.yaml "$@"
 
+    # warn if restyle left any files owned by root (which means older restyle-CLI is being used)
+    root_owned=$(find "$@" -maxdepth 0 -user 0 2>/dev/null || true)
+    if [[ -n "$root_owned" ]]; then
+        echo
+        echo "[restyle-diff.sh] WARNING: The following restyled files are owned by root:"
+        echo "$root_owned"
+        echo
+        echo "[restyle-diff.sh] This typically means your restyle CLI is older than v0.80 which fixed this bug."
+        echo "[restyle-diff.sh] Please UPGRADE to a newer restyle CLI by running"
+        echo "[restyle-diff.sh] 1. rm -f \"\$(which restyle)\" or sudo rm -f \"\$(which restyle)\""
+        echo "[restyle-diff.sh] 2. re-run this script without using sudo."
+    fi
+
 }
 
 ensure_restyle_installed() {
