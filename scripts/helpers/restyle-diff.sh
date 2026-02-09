@@ -26,9 +26,6 @@
 # if unspecified, ref defaults to upstream/master (or master)
 # -d enables debug logging for Restyle CLI
 #
-# Note: This script requires sudo to restore file ownership after restyle
-#  (which uses Docker and changes ownership of restyled files to root). Run this script as a regular user;
-#  it will prompt for sudo only when needed to restore file ownership.
 
 here=${0%/*}
 
@@ -41,15 +38,9 @@ cd "$CHIP_ROOT"
 
 restyle-paths() {
 
-    local uid="${SUDO_UID:-$(id -u)}"
-    local gid="${SUDO_GID:-$(id -g)}"
-
     echo "[restyle-diff.sh] Please wait, Restyling files (and Pulling restyler Docker images if needed)"
     restyle --config-file=.restyled.yaml "$@"
 
-    echo
-    echo "[restyle-diff.sh] Restoring file ownership to current user (sudo required)"
-    sudo chown -h "$uid:$gid" -- "$@"
 }
 
 ensure_restyle_installed() {
