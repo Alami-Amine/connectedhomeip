@@ -616,31 +616,81 @@ class TC_OPCREDS_3_1(MatterBaseTest):
         asserts.assert_equal(resp.errorCode, Clusters.GeneralCommissioning.Enums.CommissioningErrorEnum.kOk,
                              "Failure status returned from arm failsafe")
 
-        self.print_step(72, "TH2 reads its fabric index from the CurrentFabricIndex attribute and saves as FabricIndex_TH2")
+        self.print_step(72, "TH1 sends ArmFailSafe command to the DUT with the ExpiryLengthSeconds field set to failsafe_max| Verify that the DUT sends ArmFailSafeResponse Command to TH1 with field ErrorCode as 'OK'(0)")
+        cmd = Clusters.GeneralCommissioning.Commands.ArmFailSafe(expiryLengthSeconds=failsafe_max, breadcrumb=0)
+        resp = await self.send_single_cmd(dev_ctrl=TH1, node_id=newNodeId, cmd=cmd)
+        asserts.assert_equal(resp.errorCode, Clusters.GeneralCommissioning.Enums.CommissioningErrorEnum.kOk,
+                             "Failure status returned from arm failsafe")
+
+        self.print_step(73, "TH1 Sends CSRRequest command with a random 32-byte nonce and saves the response as`csrResponseNoIcac`")
+        nonce = random.randbytes(32)
+        csrResponseNoIcac = await self.send_single_cmd(dev_ctrl=TH1, node_id=newNodeId, cmd=opcreds.Commands.CSRRequest(CSRNonce=nonce, isForUpdateNOC=False))
+
+        self.print_step(74, "TH1 generates a new RCAC and NOC but Omits ICAC in the Certificate Chain")
+        # Save RCAC as `Root_CA_Certificate_TH1_4`
+        # Save NOC as `Node_Operational_Certificate_TH1_4`
+        temp_CA_NoIcac = self.certificate_authority_manager.NewCertificateAuthority()
+        temp_CA_NoIcac.alwaysOmitIcac = True
+        temp_fabric_admin = temp_CA_NoIcac.NewFabricAdmin(vendorId=0xFFF1, fabricId=3)
+        temp_controller = temp_fabric_admin.NewController(nodeId=self.default_controller.nodeId)
+        temp_certs = await temp_controller.IssueNOCChain(csrResponseNoIcac, newNodeId)
+        if (temp_certs.rcacBytes is None or temp_certs.nocBytes is None or temp_certs.ipkBytes is None):
+            # Expiring the failsafe timer in an attempt to clean up.
+            await TH1.SendCommand(newNodeId, 0, Clusters.GeneralCommissioning.Commands.ArmFailSafe(0))
+            asserts.fail("Unable to generate NOC chain for DUT - this is a script failure, please report this as a bug")
+
+        self.print_step(75, "TH1 sends the AddTrustedRootCert command using the certs generated in step 74")
+        cmd = opcreds.Commands.AddTrustedRootCertificate(temp_certs.rcacBytes)
+        await self.send_single_cmd(cmd=cmd, dev_ctrl=TH1, node_id=newNodeId)
+
+        self.print_step(76, "TH1 sends the AddNOC Command to DUT using the certs generated in step 74. The RCAC is re-used and presented as an ICAC | Verify that DUT responds with status code InvalidNOC")
+        # NOCValue as `Node_Operational_Certificate_TH1_4`
+        # ICACValue as `Root_CA_Certificate_TH1_4`
+        # CaseAdminSubject as the NodeID of TH1
+        # AdminVendorId as the Vendor ID of TH1 
+        cmd = opcreds.Commands.AddNOC(NOCValue=temp_certs.nocBytes, ICACValue=temp_certs.rcacBytes,
+                                      IPKValue=temp_certs.ipkBytes, caseAdminSubject=TH1_nodeid, adminVendorId=TH1_vid)
+        resp = await self.send_single_cmd(dev_ctrl=TH1, node_id=newNodeId, cmd=cmd)
+        asserts.assert_equal(
+            resp.statusCode, opcreds.Enums.NodeOperationalCertStatusEnum.kInvalidNOC, "Failure when adding NOC")
+        
+        self.print_step(77, "TH1 sends the AddNOC Command to DUT using the certs generated in step 74. This time, the ICAC is omitted | Verify that DUT responds with status code OK")
+        # NOCValue as `Node_Operational_Certificate_TH1_4`
+        # ICACValue as `None`
+        # CaseAdminSubject as the NodeID of TH1
+        # AdminVendorId as the Vendor ID of TH1 
+        cmd = opcreds.Commands.AddNOC(NOCValue=temp_certs.nocBytes, ICACValue=None,
+                                      IPKValue=temp_certs.ipkBytes, caseAdminSubject=TH1_nodeid, adminVendorId=TH1_vid)
+        resp = await self.send_single_cmd(dev_ctrl=TH1, node_id=newNodeId, cmd=cmd)
+        asserts.assert_equal(
+            resp.statusCode, opcreds.Enums.NodeOperationalCertStatusEnum.kOk, "Failure when adding NOC")
+
+
+        self.print_step(78, "TH2 reads its fabric index from the CurrentFabricIndex attribute and saves as FabricIndex_TH2")
         fabric_index_th2 = await self.read_single_attribute_check_success(
             cluster=opcreds, attribute=opcreds.Attributes.CurrentFabricIndex, dev_ctrl=TH2, node_id=TH2_dut_nodeid)
 
-        self.print_step(73, "TH2 sends RemoveFabric command with Fabric Index as FabricIndexTH2 + 5 (Invalid Fabric Index) to DUT | Verify that DUT sends NOCResponse Command with StatusCode of InvalidFabricIndex")
+        self.print_step(79, "TH2 sends RemoveFabric command with Fabric Index as FabricIndexTH2 + 5 (Invalid Fabric Index) to DUT | Verify that DUT sends NOCResponse Command with StatusCode of InvalidFabricIndex")
         cmd = opcreds.Commands.RemoveFabric(fabric_index_th2 + 5)
         resp = await self.send_single_cmd(dev_ctrl=TH2, node_id=TH2_dut_nodeid, cmd=cmd)
         asserts.assert_equal(resp.statusCode, opcreds.Enums.NodeOperationalCertStatusEnum.kInvalidFabricIndex)
 
-        self.print_step(74, "TH2 reads the Fabrics List from DUT using a non-fabric-filtered read")
+        self.print_step(80, "TH2 reads the Fabrics List from DUT using a non-fabric-filtered read")
         resp = await self.read_single_attribute_check_success(cluster=opcreds, attribute=opcreds.Attributes.Fabrics, dev_ctrl=TH2, node_id=TH2_dut_nodeid, fabric_filtered=False)
-        asserts.assert_equal(len(resp), fabrics_original_size + 2, "Unexpected number of fabrics on device")
+        asserts.assert_equal(len(resp), fabrics_original_size + 3, "Unexpected number of fabrics on device")
 
-        self.print_step(75, "TH1 reads its fabric index from the CurrentFabricIndex attribute and saves as FabricIndex_TH1")
+        self.print_step(81, "TH1 reads its fabric index from the CurrentFabricIndex attribute and saves as FabricIndex_TH1")
         fabric_index_th1 = await self.read_single_attribute_check_success(
             cluster=opcreds, attribute=opcreds.Attributes.CurrentFabricIndex, dev_ctrl=TH1, node_id=newNodeId)
 
         self.print_step(
-            76, "TH0 sends RemoveFabric command with Fabric Index as FabricIndex_TH1")
+            82, "TH0 sends RemoveFabric command with Fabric Index as FabricIndex_TH1")
         cmd = opcreds.Commands.RemoveFabric(fabric_index_th1)
         resp = await self.send_single_cmd(cmd=cmd)
         asserts.assert_equal(resp.statusCode, opcreds.Enums.NodeOperationalCertStatusEnum.kOk)
 
         self.print_step(
-            77, "TH0 sends RemoveFabric command with Fabric Index as FabricIndex_TH2")
+            83, "TH0 sends RemoveFabric command with Fabric Index as FabricIndex_TH2")
         cmd = opcreds.Commands.RemoveFabric(fabric_index_th2)
         resp = await self.send_single_cmd(cmd=cmd)
         asserts.assert_equal(resp.statusCode, opcreds.Enums.NodeOperationalCertStatusEnum.kOk)
