@@ -73,11 +73,11 @@ Spake2pVerifier sTestSpake2p01_PASEVerifier = { .mW0 = {
     0xCF
 } };
 
+bool sSimulateFailedSessionEstablishmentTaskCalled = false;
+
 bool sAdminFabricIndexDirty = false;
 bool sAdminVendorIdDirty    = false;
 bool sWindowStatusDirty     = false;
-
-bool sSimulateFailedSessionEstablishmentTaskCalled = false;
 
 void ResetDirtyFlags()
 {
@@ -170,7 +170,7 @@ public:
     uint8_t mOnCommissioningWindowClosedCount              = 0;
     uint8_t mOnCommissioningSessionEstablishmentErrorCount = 0;
 
-    CHIP_ERROR mError;
+    CHIP_ERROR mError = CHIP_NO_ERROR;
 };
 
 class TestCommissioningWindowManager : public chip::Testing::LoopbackMessagingContext
@@ -234,6 +234,8 @@ public:
     {
         ConfigInitializeNodes(false);
         chip::Testing::LoopbackMessagingContext::SetUp();
+
+        sSimulateFailedSessionEstablishmentTaskCalled = false;
     }
 
     void EstablishPASEHandshake(SessionManager & sessionManager, PASESession & pairingCommissioner,
