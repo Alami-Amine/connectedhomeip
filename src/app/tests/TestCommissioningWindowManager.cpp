@@ -248,7 +248,7 @@ void TestCommissioningWindowManager::ServiceEvents()
 {
     DrainAndServiceIO();
 
-    EXPECT_SUCCESS(chip::DeviceLayer::PlatformMgr().ScheduleWork(
+    ASSERT_SUCCESS(chip::DeviceLayer::PlatformMgr().ScheduleWork(
         [](intptr_t) -> void { EXPECT_SUCCESS(chip::DeviceLayer::PlatformMgr().StopEventLoopTask()); }, (intptr_t) nullptr));
     chip::DeviceLayer::PlatformMgr().RunEventLoop();
 }
@@ -427,7 +427,7 @@ TEST_F(TestCommissioningWindowManager, TestCheckCommissioningWindowManagerWindow
     EXPECT_FALSE(sAdminFabricIndexDirty);
     EXPECT_FALSE(sAdminVendorIdDirty);
 
-    // Advance time to so that the commissioning window times out
+    // Advance time so that the commissioning window times out
     clock.AdvanceMonotonic(chip::System::Clock::Milliseconds64(kTimeoutMs + kSleepPadding));
     ServiceEvents();
 
