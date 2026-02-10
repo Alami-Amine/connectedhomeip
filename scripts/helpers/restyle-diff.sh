@@ -37,6 +37,7 @@ CHIP_ROOT=$(cd "$here/../.." && pwd)
 cd "$CHIP_ROOT"
 
 restyle-paths() {
+    [[ $# -eq 0 ]] && return 0
 
     echo "[restyle-diff.sh] Please wait, Restyling files (and Pulling restyler Docker images if needed)"
     restyle --config-file=.restyled.yaml "$@"
@@ -50,8 +51,8 @@ restyle-paths() {
         echo
         echo "[restyle-diff.sh] This typically means your restyle CLI is older than v0.80 which fixed this bug."
         echo "[restyle-diff.sh] Please UPGRADE to a newer restyle CLI by running"
-        echo "[restyle-diff.sh] 1. rm -f \"\$(which restyle)\" or sudo rm -f \"\$(which restyle)\""
-        echo "[restyle-diff.sh] 2. re-run this script without using sudo."
+        echo "[restyle-diff.sh] 1. rm -f \"\$(command -v restyle)\""
+        echo "[restyle-diff.sh] 2. re-run this script without using sudo (it will automatically download latest restyle-CLI version)."
     fi
 
 }
