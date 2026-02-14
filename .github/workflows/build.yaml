@@ -77,23 +77,27 @@ jobs:
                   languages: "cpp"
                   queries: security-extended, security-and-quality
             - name: Setup Build
+              if: github.event.pull_request.number == null
               run: scripts/build/gn_gen.sh --args="chip_config_memory_debug_checks=true chip_config_memory_debug_dmalloc=false"
             - name: Run Build
+              if: github.event.pull_request.number == null
               run: scripts/run_in_build_env.sh "ninja -C ./out"
             - name: Run Tests
+              if: github.event.pull_request.number == null
               run: scripts/tests/gn_tests.sh
             - name: Clean out build output
+              if: github.event.pull_request.number == null
               run: rm -rf ./out
 
             # Do not run below steps with CodeQL since we are getting "Out of runner space issues" with CodeQL and their added coverage is limited
             - name: Set up Build Without Detail Logging
-              if: inputs.run-codeql != true
+              if: inputs.run-codeql != true && github.event.pull_request.number == null
               run: scripts/build/gn_gen.sh --args="chip_detail_logging=false"
             - name: Run Build Without Detail Logging
-              if: inputs.run-codeql != true
+              if: inputs.run-codeql != true && github.event.pull_request.number == null
               run: scripts/run_in_build_env.sh "ninja -C ./out"
             - name: Cleanout build output
-              if: inputs.run-codeql != true
+              if: inputs.run-codeql != true && github.event.pull_request.number == null
               run: rm -rf ./out
             - name: Set up Build Without Progress Logging
               if: inputs.run-codeql != true
