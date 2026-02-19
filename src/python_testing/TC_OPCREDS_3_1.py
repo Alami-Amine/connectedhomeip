@@ -1,4 +1,4 @@
-#
+ #
 #    Copyright (c) 2023 Project CHIP Authors
 #    All rights reserved.
 #
@@ -33,13 +33,20 @@
 #     factory-reset: true
 #     quiet: true
 # === END CI TEST ARGUMENTS ===
+
+
 import copy
+
 import logging
+
 import random
+
+from time import sleep
 
 from mobly import asserts
 
 import matter.clusters as Clusters
+
 import matter.discovery as Discovery
 from matter import ChipDeviceCtrl
 from matter.exceptions import ChipStackError
@@ -679,11 +686,45 @@ class TC_OPCREDS_3_1(MatterBaseTest):
         asserts.assert_equal(
             resp.statusCode, opcreds.Enums.NodeOperationalCertStatusEnum.kOk, "Failure when adding NOC")
 
-        self.print_step(79, "TH3 sends ArmFailSafe command to the DUT with ExpiryLengthSeconds set to 0| Verify that the DUT sends ArmFailSafeResponse Command to TH3 with field ErrorCode as 'OK'(0)")
+        sleep(3)
+        print("--------------------------")
+        print("--------------------------")
+        print("--------------------------")
+        print("--------------------------")
+        print("--------------------------")
+
+        self.print_step(
+            79, "V1 TH3 checks value of Fabrics attribute using a non-fabric-filtered read and saves the size as Fabrics_TH3_Size")
+
+        fabrics_th3 = await self.read_single_attribute_check_success(
+            dev_ctrl=TH3, node_id=TH3_dut_nodeid, cluster=opcreds, attribute=opcreds.Attributes.Fabrics, fabric_filtered=False)
+
+        print(f" Amine V1 fabrics_th3: {fabrics_th3}")
+
+        sleep(3)
+        print("--------------------------")
+        print("--------------------------")
+        print("--------------------------")
+        print("--------------------------")
+        print("--------------------------")
+        self.print_step(80, "TH3 sends ArmFailSafe command to the DUT with ExpiryLengthSeconds set to 0| Verify that the DUT sends ArmFailSafeResponse Command to TH3 with field ErrorCode as 'OK'(0)")
         cmd = Clusters.GeneralCommissioning.Commands.ArmFailSafe(expiryLengthSeconds=0, breadcrumb=0)
         resp = await self.send_single_cmd(dev_ctrl=TH3, node_id=TH3_dut_nodeid, cmd=cmd)
         asserts.assert_equal(resp.errorCode, Clusters.GeneralCommissioning.Enums.CommissioningErrorEnum.kOk,
                              "Failure status returned from arm failsafe")
+
+        sleep(3)
+        print("--------------------------")
+        print("--------------------------")
+        print("--------------------------")
+        print("--------------------------")
+        print("--------------------------")
+        self.print_step(81, "TH3 checks value of Fabrics attribute using a non-fabric-filtered read and saves the size as Fabrics_TH3_Size")
+
+        fabrics_th3 = await self.read_single_attribute_check_success(
+            dev_ctrl=TH3, node_id=TH3_dut_nodeid, cluster=opcreds, attribute=opcreds.Attributes.Fabrics, fabric_filtered=False)
+
+        print(f" Amine V2 fabrics_th3: {fabrics_th3}")
 
         self.print_step(80, "TH2 reads its fabric index from the CurrentFabricIndex attribute and saves as FabricIndex_TH2")
         fabric_index_th2 = await self.read_single_attribute_check_success(
