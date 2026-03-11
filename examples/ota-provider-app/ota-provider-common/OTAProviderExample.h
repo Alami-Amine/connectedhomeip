@@ -47,7 +47,7 @@ public:
 
     size_t kProtocolsSupportedCount = 0;
 
-    typedef struct DeviceSoftwareVersionModel
+    struct DeviceSoftwareVersionModel
     {
         chip::VendorId vendorId;
         uint16_t productId;
@@ -58,7 +58,8 @@ public:
         uint32_t minApplicableSoftwareVersion;
         uint32_t maxApplicableSoftwareVersion;
         char otaURL[kOtaUrlMaxLen];
-    } DeviceSoftwareVersionModel;
+        uint16_t otaFileDesignator;
+    };
 
     //////////// OTAProviderDelegate Implementation ///////////////
     void HandleQueryImage(
@@ -128,9 +129,13 @@ private:
     void
     SaveCommandSnapshot(const chip::app::Clusters::OtaSoftwareUpdateProvider::Commands::QueryImage::DecodableType & commandData);
 
+    void AddToFilePathsMap(const std::string & newFilePath);
+
     BdxOtaSender mBdxOtaSender;
     std::vector<DeviceSoftwareVersionModel> mCandidates;
     char mOTAFilePath[kFilepathBufLen]; // null-terminated
+    std::vector<std::string> mFilePathsMap;
+    uint16_t mSelectedFileDesignator = UINT16_MAX;
     char mImageUri[kUriMaxLen];
     OTAQueryStatus mQueryImageStatus;
     OTAApplyUpdateAction mUpdateAction;

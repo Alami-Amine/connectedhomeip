@@ -24,6 +24,7 @@
 #include <messaging/Flags.h>
 #include <protocols/bdx/BdxTransferSession.h>
 
+#include <charconv>
 #include <fstream>
 
 using chip::bdx::StatusCode;
@@ -122,6 +123,17 @@ void BdxOtaSender::HandleTransferSessionOutput(TransferSession::OutputEvent & ev
         memcpy(mFileDesignator, fd, fdl);
         mFileDesignator[fdl] = 0;
 
+        // Select the file path based on the file designator
+        uint16_t index = 0;
+        auto [ptr, ec] = std::from_chars(mFileDesignator, mFileDesignator + fdl, index);
+        if (mFilePathsMap == nullptr || ec != std::errc{} || ptr != (mFileDesignator + fdl) || index >= mFilePathsMap->size())
+        {
+            VerifyOrReturn(mTransfer.AbortTransfer(StatusCode::kFileDesignatorUnknown) == CHIP_NO_ERROR,
+                           ChipLogError(BDX, "AbortTransfer failed"));
+            return;
+        }
+        mSelectedFileIndex = index;
+
         break;
     }
     case TransferSession::OutputEventType::kQueryReceived:
@@ -152,7 +164,13 @@ void BdxOtaSender::HandleTransferSessionOutput(TransferSession::OutputEvent & ev
             return;
         }
 
-        std::ifstream otaFile(mFileDesignator, std::ifstream::in);
+        if (mFilePathsMap == nullptr || mSelectedFileIndex >= mFilePathsMap->size())
+        {
+            VerifyOrReturn(mTransfer.AbortTransfer(StatusCode::kFileDesignatorUnknown) == CHIP_NO_ERROR,
+                           ChipLogError(BDX, "AbortTransfer failed"));
+            return;
+        }
+        std::ifstream otaFile((*mFilePathsMap)[mSelectedFileIndex], std::ifstream::in);
         if (!otaFile.good())
         {
             ChipLogError(BDX, "OTA file open failed");
@@ -235,6 +253,7 @@ void BdxOtaSender::Reset()
     mInitialized  = false;
     mNumBytesSent = 0;
     memset(mFileDesignator, 0, chip::bdx::kMaxFileDesignatorLen);
+    mSelectedFileIndex = UINT16_MAX;
 }
 
 void BdxOtaSender::AbortTransfer()

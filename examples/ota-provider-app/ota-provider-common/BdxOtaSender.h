@@ -18,6 +18,9 @@
 #include <protocols/bdx/BdxTransferSession.h>
 #include <protocols/bdx/TransferFacilitator.h>
 
+#include <string>
+#include <vector>
+
 #pragma once
 
 class BdxOtaSender : public chip::bdx::Responder
@@ -30,6 +33,8 @@ public:
 
     void AbortTransfer();
 
+    void SetFilePathsMap(const std::vector<std::string> & filePaths) { mFilePathsMap = &filePaths; }
+
 private:
     // Inherited from bdx::TransferFacilitator
     void HandleTransferSessionOutput(chip::bdx::TransferSession::OutputEvent & event) override;
@@ -38,6 +43,8 @@ private:
 
     // Null-terminated string representing file designator
     char mFileDesignator[chip::bdx::kMaxFileDesignatorLen];
+    const std::vector<std::string> * mFilePathsMap = nullptr;
+    uint16_t mSelectedFileIndex                    = UINT16_MAX;
 
     uint32_t mNumBytesSent = 0;
 

@@ -109,11 +109,18 @@ void OTAProviderExample::SetOTAFilePath(const char * path)
     if (path != nullptr)
     {
         chip::Platform::CopyString(mOTAFilePath, path);
+        AddToFilePathsMap(path);
+        mBdxOtaSender.SetFilePathsMap(mFilePathsMap);
     }
     else
     {
         memset(mOTAFilePath, 0, sizeof(mOTAFilePath));
     }
+}
+
+void OTAProviderExample::AddToFilePathsMap(const std::string & newFilePath)
+{
+    mFilePathsMap.push_back(newFilePath);
 }
 
 void OTAProviderExample::SetImageUri(const char * imageUri)
@@ -131,6 +138,7 @@ void OTAProviderExample::SetImageUri(const char * imageUri)
 void OTAProviderExample::SetOTACandidates(std::vector<OTAProviderExample::DeviceSoftwareVersionModel> candidates)
 {
     mCandidates = std::move(candidates);
+    mFilePathsMap.clear();
 
     // Validate that each candidate matches the info in the image header
     for (auto candidate : mCandidates)
@@ -155,7 +163,10 @@ void OTAProviderExample::SetOTACandidates(std::vector<OTAProviderExample::Device
             VerifyOrDie(candidate.maxApplicableSoftwareVersion == header.mMaxApplicableVersion.Value());
         }
         parser.Clear();
+
+        AddToFilePathsMap(candidate.otaURL);
     }
+    mBdxOtaSender.SetFilePathsMap(mFilePathsMap);
 }
 
 static bool CompareSoftwareVersions(const OTAProviderExample::DeviceSoftwareVersionModel & a,
@@ -263,11 +274,15 @@ void OTAProviderExample::SendQueryImageResponse(app::CommandHandler * commandObj
         NodeId nodeId                 = fabricInfo->GetPeerId().GetNodeId();
 
         // Generate the ImageURI if one is not already preset
+        // TODO should i reset mImageUri somewhere? it will probably presist if we have multiple QueryImage commands
         if (strlen(mImageUri) == 0)
         {
             // Only supporting BDX protocol for now
             MutableCharSpan uri(mImageUri);
-            CHIP_ERROR error = chip::bdx::MakeURI(nodeId, CharSpan::fromCharString(mOTAFilePath), uri);
+            char fileDesignatorBuffer[6];
+            int len = std::snprintf(fileDesignatorBuffer, sizeof(fileDesignatorBuffer), "%d", mSelectedFileDesignator);
+            chip::CharSpan fileDesignatorSpan(fileDesignatorBuffer, static_cast<size_t>(len));
+            CHIP_ERROR error = chip::bdx::MakeURI(nodeId, fileDesignatorSpan, uri);
             if (error != CHIP_NO_ERROR)
             {
                 ChipLogError(SoftwareUpdate, "Cannot generate URI");
@@ -393,7 +408,13 @@ void OTAProviderExample::HandleQueryImage(app::CommandHandler * commandObj, cons
                 // This assumes all candidates have passed verification so the values are safe to use
                 mSoftwareVersion = candidate.softwareVersion;
                 memcpy(mSoftwareVersionString, candidate.softwareVersionString, strlen(candidate.softwareVersionString));
-                SetOTAFilePath(candidate.otaURL);
+                mSelectedFileDesignator = candidate.otaFileDesignator;
+            }
+            else
+            {
+                // None of the candidates matched
+                mQueryImageStatus       = OTAQueryStatus::kNotAvailable;
+                mSelectedFileDesignator = UINT16_MAX;
             }
         }
         else if (strlen(mOTAFilePath) > 0) // If OTA file is directly provided
@@ -406,6 +427,9 @@ void OTAProviderExample::HandleQueryImage(app::CommandHandler * commandObj, cons
             mSoftwareVersion = header.mSoftwareVersion;
             memcpy(mSoftwareVersionString, header.mSoftwareVersionString.data(), header.mSoftwareVersionString.size());
             parser.Clear();
+
+            // Default to 0 when there is only a single file.
+            mSelectedFileDesignator = 0;
         }
 
         // If mUserConsentNeeded (set by the CLI) is true and requestor is capable of taking user consent

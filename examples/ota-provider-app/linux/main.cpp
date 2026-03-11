@@ -110,6 +110,7 @@ static bool ParseJsonFileAndPopulateCandidates(const char * filepath,
     }
     else
     {
+        uint16_t OtaFileIndex = 0;
         for (const auto & iter : devSofVerModValue)
         {
             OTAProviderExample::DeviceSoftwareVersionModel candidate;
@@ -123,6 +124,7 @@ static bool ParseJsonFileAndPopulateCandidates(const char * filepath,
             candidate.maxApplicableSoftwareVersion =
                 static_cast<uint32_t>(iter.get("maxApplicableSoftwareVersion", 1000).asUInt64());
             chip::Platform::CopyString(candidate.otaURL, iter.get("otaURL", "https://test.com").asCString());
+            candidate.otaFileDesignator = OtaFileIndex++;
             candidates.push_back(candidate);
             ret = true;
         }
@@ -289,7 +291,8 @@ OptionDef cmdLineOptionsDef[] = {
     { "maxBDXBlockSize", chip::ArgParser::kArgumentRequired, kOptionMaxBDXBlockSize },
     {},
 };
-
+// TODO : add warning for imageUri option? or maybe add a way to parse it and extract filedesignator and make it opaque/map it? or
+// no need
 OptionSet cmdLineOptions = { HandleOptions, cmdLineOptionsDef, "PROGRAM OPTIONS",
                              "  -a, --applyUpdateAction <proceed | awaitNextAction | discontinue>\n"
                              "        Value for the Action field in the first ApplyUpdateResponse.\n"
@@ -389,7 +392,6 @@ void ApplicationInit()
     }
 
     ChipLogDetail(SoftwareUpdate, "Using ImageList file: %s", gOtaImageListFilepath ? gOtaImageListFilepath : "(none)");
-
     if (gOtaImageListFilepath != nullptr)
     {
         // Parse JSON file and load the ota candidates
