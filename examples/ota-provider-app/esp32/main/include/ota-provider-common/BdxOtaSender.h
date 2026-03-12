@@ -18,6 +18,9 @@
 #include <protocols/bdx/BdxTransferSession.h>
 #include <protocols/bdx/TransferFacilitator.h>
 
+#include <string>
+#include <vector>
+
 #pragma once
 
 enum BdxSenderErrorTypes
@@ -101,6 +104,9 @@ public:
      * @return File designator for the transfer
      */
     const char * GetFileDesignator() const { return mFileDesignator; }
+
+    // No-op, ESP32's BdxOtaSender doesn't need to SetFilePathsMaps since it uses a callback
+    void SetFilePathsMap(const std::vector<std::string> & filePaths) {}
 
 private:
     // Inherited from bdx::TransferFacilitator

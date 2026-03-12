@@ -173,12 +173,13 @@ CHIP_ERROR OnBlockQuery(void * context, chip::System::PacketBufferHandle & block
             return CHIP_ERROR_INCORRECT_STATE;
         }
 
-        char otaImagePath[kMaxImagePathlen];
-        memset(otaImagePath, 0, sizeof(otaImagePath));
-        snprintf(otaImagePath, sizeof(otaImagePath), "%s", fileDesignator);
-        ESP_LOGI(TAG, "File designator: %s", otaImagePath);
-
-        otaImageFile = fopen(otaImagePath, "r");
+        ESP_LOGI(TAG, "File designator: %s", fileDesignator);
+        const char * filePath = otaProvider.GetFilePathForDesignator(fileDesignator);
+        if (filePath == nullptr)
+        {
+            return CHIP_ERROR_INVALID_ARGUMENT;
+        }
+        otaImageFile = fopen(filePath, "r");
         if (otaImageFile == NULL)
 
         {

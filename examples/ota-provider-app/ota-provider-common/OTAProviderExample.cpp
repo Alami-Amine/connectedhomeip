@@ -28,6 +28,7 @@
 #include <lib/support/CHIPMemString.h>
 #include <protocols/bdx/BdxUri.h>
 
+#include <charconv>
 #include <fstream>
 #include <string.h>
 
@@ -48,8 +49,6 @@ using namespace chip;
 using namespace chip::ota;
 using namespace chip::app::Clusters::OtaSoftwareUpdateProvider;
 using namespace chip::app::Clusters::OtaSoftwareUpdateProvider::Commands;
-
-#include <ota-provider-common/OTAProviderExample.h>
 
 namespace {
 OTAProviderExample gOtaProvider;
@@ -109,12 +108,16 @@ void OTAProviderExample::SetOTAFilePath(const char * path)
     if (path != nullptr)
     {
         chip::Platform::CopyString(mOTAFilePath, path);
+
+        mFilePathsMap.clear();
         AddToFilePathsMap(path);
+
         mBdxOtaSender.SetFilePathsMap(mFilePathsMap);
     }
     else
     {
         memset(mOTAFilePath, 0, sizeof(mOTAFilePath));
+        mFilePathsMap.clear();
     }
 }
 
@@ -128,6 +131,7 @@ void OTAProviderExample::SetImageUri(const char * imageUri)
     if (imageUri != nullptr)
     {
         chip::Platform::CopyString(mImageUri, imageUri);
+        mImageUriIsSupplied = true;
     }
     else
     {
@@ -274,13 +278,12 @@ void OTAProviderExample::SendQueryImageResponse(app::CommandHandler * commandObj
         NodeId nodeId                 = fabricInfo->GetPeerId().GetNodeId();
 
         // Generate the ImageURI if one is not already preset
-        // TODO should i reset mImageUri somewhere? it will probably presist if we have multiple QueryImage commands
         if (strlen(mImageUri) == 0)
         {
             // Only supporting BDX protocol for now
             MutableCharSpan uri(mImageUri);
             char fileDesignatorBuffer[6];
-            int len = std::snprintf(fileDesignatorBuffer, sizeof(fileDesignatorBuffer), "%d", mSelectedFileDesignator);
+            int len = std::snprintf(fileDesignatorBuffer, sizeof(fileDesignatorBuffer), "%u", mSelectedFileDesignator);
             chip::CharSpan fileDesignatorSpan(fileDesignatorBuffer, static_cast<size_t>(len));
             CHIP_ERROR error = chip::bdx::MakeURI(nodeId, fileDesignatorSpan, uri);
             if (error != CHIP_NO_ERROR)
@@ -432,6 +435,13 @@ void OTAProviderExample::HandleQueryImage(app::CommandHandler * commandObj, cons
             mSelectedFileDesignator = 0;
         }
 
+        // Reset the ImageURI if it is not supplied by the user since it may contain file designators that are not relevant for
+        // every query
+        if (!mImageUriIsSupplied)
+        {
+            memset(mImageUri, 0, sizeof(mImageUri));
+        }
+
         // If mUserConsentNeeded (set by the CLI) is true and requestor is capable of taking user consent
         // then delegate obtaining user consent to the requestor
         if (mUserConsentDelegate && (requestorCanConsent && mUserConsentNeeded) == false)
@@ -507,4 +517,18 @@ void OTAProviderExample::HandleNotifyUpdateApplied(app::CommandHandler * command
     ChipLogDetail(SoftwareUpdate, "%s: token: %s, version: %" PRIu32, __FUNCTION__, tokenBuf, commandData.softwareVersion);
 
     commandObj->AddStatus(commandPath, Status::Success);
+}
+
+const char * OTAProviderExample::GetFilePathForDesignator(const char * designator) const
+{
+    uint16_t index       = 0;
+    size_t designatorLen = strlen(designator);
+
+    auto [ptr, ec] = std::from_chars(designator, designator + designatorLen, index);
+    if (ec != std::errc{} || ptr != designator + designatorLen || index >= mFilePathsMap.size())
+    {
+        return nullptr;
+    }
+
+    return mFilePathsMap[index].c_str();
 }

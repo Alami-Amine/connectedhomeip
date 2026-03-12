@@ -24,6 +24,8 @@
 #include <app/clusters/ota-provider/ota-provider-delegate.h>
 #include <lib/core/OTAImageHeader.h>
 #include <ota-provider-common/BdxOtaSender.h>
+
+#include <string>
 #include <vector>
 
 /**
@@ -108,6 +110,8 @@ public:
     bool GetRequestorCanConsent() const { return mRequestorCanConsent; }
     const char * GetLocation() const { return mLocation; }
 
+    const char * GetFilePathForDesignator(const char * designator) const;
+
 private:
     bool SelectOTACandidate(const uint16_t requestorVendorID, const uint16_t requestorProductID,
                             const uint32_t requestorSoftwareVersion,
@@ -137,6 +141,7 @@ private:
     std::vector<std::string> mFilePathsMap;
     uint16_t mSelectedFileDesignator = UINT16_MAX;
     char mImageUri[kUriMaxLen];
+    bool mImageUriIsSupplied = false;
     OTAQueryStatus mQueryImageStatus;
     OTAApplyUpdateAction mUpdateAction;
     uint32_t mIgnoreQueryImageCount;
