@@ -183,7 +183,7 @@ jobs:
         runs-on: namespace-profile-1x2
 
         container:
-            image: ghcr.io/project-chip/chip-build:177
+            image: ghcr.io/project-chip/chip-build:184
             volumes:
                 - /var/run/nsc/:/var/run/nsc/
             env:
@@ -243,4 +243,4 @@ jobs:
             - name: Run Tests ${{matrix.filter}}
               if: ${{matrix.filter != ''}}
               run: |
-                  scripts/run_in_python_env.sh out/venv 'src/python_testing/execute_python_tests.py --env-file /tmp/test_env.yaml --search-directory src/python_testing --regex "${{matrix.filter}}"'
+                  scripts/run_in_python_env.sh out/venv 'src/python_testing/execute_python_tests.py run --env-file /tmp/test_env.yaml --search-directory src/python_testing --regex "${{matrix.filter}}"'
