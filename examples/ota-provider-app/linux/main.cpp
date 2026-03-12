@@ -291,8 +291,6 @@ OptionDef cmdLineOptionsDef[] = {
     { "maxBDXBlockSize", chip::ArgParser::kArgumentRequired, kOptionMaxBDXBlockSize },
     {},
 };
-// TODO : add warning for imageUri option? or maybe add a way to parse it and extract filedesignator and make it opaque/map it? or
-// no need
 OptionSet cmdLineOptions = { HandleOptions, cmdLineOptionsDef, "PROGRAM OPTIONS",
                              "  -a, --applyUpdateAction <proceed | awaitNextAction | discontinue>\n"
                              "        Value for the Action field in the first ApplyUpdateResponse.\n"
@@ -392,6 +390,7 @@ void ApplicationInit()
     }
 
     ChipLogDetail(SoftwareUpdate, "Using ImageList file: %s", gOtaImageListFilepath ? gOtaImageListFilepath : "(none)");
+
     if (gOtaImageListFilepath != nullptr)
     {
         // Parse JSON file and load the ota candidates

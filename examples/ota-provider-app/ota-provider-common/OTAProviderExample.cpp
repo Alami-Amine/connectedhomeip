@@ -145,7 +145,7 @@ void OTAProviderExample::SetOTACandidates(std::vector<OTAProviderExample::Device
     mFilePathsMap.clear();
 
     // Validate that each candidate matches the info in the image header
-    for (auto candidate : mCandidates)
+    for (auto & candidate : mCandidates)
     {
         OTAImageHeaderParser parser;
         OTAImageHeader header;
@@ -168,6 +168,8 @@ void OTAProviderExample::SetOTACandidates(std::vector<OTAProviderExample::Device
         }
         parser.Clear();
 
+        // Assign the designator from the index to make sure it always matches the map
+        candidate.otaFileDesignator = static_cast<uint16_t>(mFilePathsMap.size());
         AddToFilePathsMap(candidate.otaURL);
     }
     mBdxOtaSender.SetFilePathsMap(mFilePathsMap);
@@ -436,7 +438,7 @@ void OTAProviderExample::HandleQueryImage(app::CommandHandler * commandObj, cons
         }
 
         // Reset the ImageURI if it is not supplied by the user since it may contain file designators that are not relevant for
-        // every query
+        // every ImageQuery
         if (!mImageUriIsSupplied)
         {
             memset(mImageUri, 0, sizeof(mImageUri));
