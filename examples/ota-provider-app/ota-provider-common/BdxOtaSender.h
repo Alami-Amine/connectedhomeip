@@ -44,7 +44,7 @@ private:
     // Null-terminated string representing file designator
     char mFileDesignator[chip::bdx::kMaxFileDesignatorLen];
     const std::vector<std::string> * mFilePaths = nullptr;
-    uint16_t mSelectedFileIndex                    = UINT16_MAX;
+    uint16_t mSelectedFileIndex                 = UINT16_MAX;
 
     uint32_t mNumBytesSent = 0;
 
