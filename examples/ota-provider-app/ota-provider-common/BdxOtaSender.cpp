@@ -126,7 +126,7 @@ void BdxOtaSender::HandleTransferSessionOutput(TransferSession::OutputEvent & ev
         // Select the file path based on the file designator
         uint16_t index = 0;
         auto [ptr, ec] = std::from_chars(mFileDesignator, mFileDesignator + fdl, index);
-        if (mFilePathsMap == nullptr || ec != std::errc{} || ptr != (mFileDesignator + fdl) || index >= mFilePathsMap->size())
+        if (mFilePaths == nullptr || ec != std::errc{} || ptr != (mFileDesignator + fdl) || index >= mFilePaths->size())
         {
             VerifyOrReturn(mTransfer.AbortTransfer(StatusCode::kFileDesignatorUnknown) == CHIP_NO_ERROR,
                            ChipLogError(BDX, "AbortTransfer failed"));
@@ -164,13 +164,13 @@ void BdxOtaSender::HandleTransferSessionOutput(TransferSession::OutputEvent & ev
             return;
         }
 
-        if (mFilePathsMap == nullptr || mSelectedFileIndex >= mFilePathsMap->size())
+        if (mFilePaths == nullptr || mSelectedFileIndex >= mFilePaths->size())
         {
             VerifyOrReturn(mTransfer.AbortTransfer(StatusCode::kFileDesignatorUnknown) == CHIP_NO_ERROR,
                            ChipLogError(BDX, "AbortTransfer failed"));
             return;
         }
-        std::ifstream otaFile((*mFilePathsMap)[mSelectedFileIndex], std::ifstream::in);
+        std::ifstream otaFile((*mFilePaths)[mSelectedFileIndex], std::ifstream::in);
         if (!otaFile.good())
         {
             ChipLogError(BDX, "OTA file open failed");

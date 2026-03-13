@@ -133,12 +133,11 @@ private:
     void
     SaveCommandSnapshot(const chip::app::Clusters::OtaSoftwareUpdateProvider::Commands::QueryImage::DecodableType & commandData);
 
-    void AddToFilePathsMap(const std::string & newFilePath);
+    uint16_t AppendFilePath(const std::string & newFilePath);
 
     BdxOtaSender mBdxOtaSender;
     std::vector<DeviceSoftwareVersionModel> mCandidates;
-    char mOTAFilePath[kFilepathBufLen]; // null-terminated
-    std::vector<std::string> mFilePathsMap;
+    std::vector<std::string> mFilePaths;
     uint16_t mSelectedFileDesignator = UINT16_MAX;
     char mImageUri[kUriMaxLen];
     bool mImageUriIsSupplied = false;

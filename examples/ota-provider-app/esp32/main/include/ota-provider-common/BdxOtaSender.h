@@ -105,8 +105,8 @@ public:
      */
     const char * GetFileDesignator() const { return mFileDesignator; }
 
-    // No-op, ESP32's BdxOtaSender doesn't need to SetFilePathsMaps since it uses a callback
-    void SetFilePathsMap(const std::vector<std::string> &) {}
+    // No-op, ESP32's BdxOtaSender doesn't need to SetFilePaths since it uses a callback
+    void SetFilePaths(const std::vector<std::string> &) {}
 
 private:
     // Inherited from bdx::TransferFacilitator

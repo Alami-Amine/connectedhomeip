@@ -88,7 +88,6 @@ void GenerateUpdateToken(uint8_t * buf, size_t bufSize)
 
 OTAProviderExample::OTAProviderExample()
 {
-    memset(mOTAFilePath, 0, sizeof(mOTAFilePath));
     memset(mImageUri, 0, sizeof(mImageUri));
     mIgnoreQueryImageCount     = 0;
     mIgnoreApplyUpdateCount    = 0;
@@ -103,27 +102,29 @@ OTAProviderExample::OTAProviderExample()
     mCandidates.clear();
 }
 
+// Called when a single OTA image file is provided directly (not via candidates/image list)
 void OTAProviderExample::SetOTAFilePath(const char * path)
 {
     if (path != nullptr)
     {
-        chip::Platform::CopyString(mOTAFilePath, path);
-
-        mFilePathsMap.clear();
-        AddToFilePathsMap(path);
-
-        mBdxOtaSender.SetFilePathsMap(mFilePathsMap);
+        mFilePaths.clear();
+        AppendFilePath(path);
+        // Select the file we just appended, which has an index of 0 and thus a designator of "0"
+        mSelectedFileDesignator = 0;
+        mBdxOtaSender.SetFilePaths(mFilePaths);
     }
     else
     {
-        memset(mOTAFilePath, 0, sizeof(mOTAFilePath));
-        mFilePathsMap.clear();
+        mFilePaths.clear();
+        mSelectedFileDesignator = UINT16_MAX;
     }
 }
 
-void OTAProviderExample::AddToFilePathsMap(const std::string & newFilePath)
+uint16_t OTAProviderExample::AppendFilePath(const std::string & newFilePath)
 {
-    mFilePathsMap.push_back(newFilePath);
+    mFilePaths.push_back(newFilePath);
+    uint16_t index = static_cast<uint16_t>(mFilePaths.size() - 1);
+    return index;
 }
 
 void OTAProviderExample::SetImageUri(const char * imageUri)
@@ -136,13 +137,14 @@ void OTAProviderExample::SetImageUri(const char * imageUri)
     else
     {
         memset(mImageUri, 0, sizeof(mImageUri));
+        mImageUriIsSupplied = false;
     }
 }
 
 void OTAProviderExample::SetOTACandidates(std::vector<OTAProviderExample::DeviceSoftwareVersionModel> candidates)
 {
     mCandidates = std::move(candidates);
-    mFilePathsMap.clear();
+    mFilePaths.clear();
 
     // Validate that each candidate matches the info in the image header
     for (auto & candidate : mCandidates)
@@ -168,11 +170,10 @@ void OTAProviderExample::SetOTACandidates(std::vector<OTAProviderExample::Device
         }
         parser.Clear();
 
-        // Assign the designator from the index to make sure it always matches the map
-        candidate.otaFileDesignator = static_cast<uint16_t>(mFilePathsMap.size());
-        AddToFilePathsMap(candidate.otaURL);
+        // Assign the file designator to the index of the appended file path
+        candidate.otaFileDesignator = AppendFilePath(candidate.otaURL);
     }
-    mBdxOtaSender.SetFilePathsMap(mFilePathsMap);
+    mBdxOtaSender.SetFilePaths(mFilePaths);
 }
 
 static bool CompareSoftwareVersions(const OTAProviderExample::DeviceSoftwareVersionModel & a,
@@ -283,6 +284,8 @@ void OTAProviderExample::SendQueryImageResponse(app::CommandHandler * commandObj
         if (strlen(mImageUri) == 0)
         {
             // Only supporting BDX protocol for now
+
+            VerifyOrDie(mSelectedFileDesignator < mFilePaths.size());
             MutableCharSpan uri(mImageUri);
             char fileDesignatorBuffer[6];
             int len = std::snprintf(fileDesignatorBuffer, sizeof(fileDesignatorBuffer), "%u", mSelectedFileDesignator);
@@ -422,18 +425,18 @@ void OTAProviderExample::HandleQueryImage(app::CommandHandler * commandObj, cons
                 mSelectedFileDesignator = UINT16_MAX;
             }
         }
-        else if (strlen(mOTAFilePath) > 0) // If OTA file is directly provided
+        else if (mFilePaths.size() == 1) // If OTA file is directly provided
         {
             // Parse the header and set version info based on the header
             OTAImageHeaderParser parser;
             OTAImageHeader header;
-            VerifyOrDie(ParseOTAHeader(parser, mOTAFilePath, header) == true);
+            VerifyOrDie(ParseOTAHeader(parser, mFilePaths[0].c_str(), header) == true);
             VerifyOrDie(sizeof(mSoftwareVersionString) > header.mSoftwareVersionString.size());
             mSoftwareVersion = header.mSoftwareVersion;
             memcpy(mSoftwareVersionString, header.mSoftwareVersionString.data(), header.mSoftwareVersionString.size());
             parser.Clear();
 
-            // Default to 0 when there is only a single file.
+            // Select the only available file path, which has an index of 0 and designator of "0"
             mSelectedFileDesignator = 0;
         }
 
@@ -527,10 +530,10 @@ const char * OTAProviderExample::GetFilePathForDesignator(const char * designato
     size_t designatorLen = strlen(designator);
 
     auto [ptr, ec] = std::from_chars(designator, designator + designatorLen, index);
-    if (ec != std::errc{} || ptr != designator + designatorLen || index >= mFilePathsMap.size())
+    if (ec != std::errc{} || ptr != designator + designatorLen || index >= mFilePaths.size())
     {
         return nullptr;
     }
 
-    return mFilePathsMap[index].c_str();
+    return mFilePaths[index].c_str();
 }

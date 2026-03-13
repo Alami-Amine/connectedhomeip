@@ -33,7 +33,7 @@ public:
 
     void AbortTransfer();
 
-    void SetFilePathsMap(const std::vector<std::string> & filePaths) { mFilePathsMap = &filePaths; }
+    void SetFilePaths(const std::vector<std::string> & filePaths) { mFilePaths = &filePaths; }
 
 private:
     // Inherited from bdx::TransferFacilitator
@@ -43,7 +43,7 @@ private:
 
     // Null-terminated string representing file designator
     char mFileDesignator[chip::bdx::kMaxFileDesignatorLen];
-    const std::vector<std::string> * mFilePathsMap = nullptr;
+    const std::vector<std::string> * mFilePaths = nullptr;
     uint16_t mSelectedFileIndex                    = UINT16_MAX;
 
     uint32_t mNumBytesSent = 0;
