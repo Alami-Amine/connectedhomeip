@@ -123,7 +123,10 @@ void BdxOtaSender::HandleTransferSessionOutput(TransferSession::OutputEvent & ev
         memcpy(mFileDesignator, fd, fdl);
         mFileDesignator[fdl] = 0;
 
-        // Select the file path based on the file designator
+        // Reset selected file index before processing a new file designator
+        mSelectedFileIndex = UINT16_MAX;
+
+        // Select the file path to serve based on the file designator
         uint16_t index = 0;
         auto [ptr, ec] = std::from_chars(mFileDesignator, mFileDesignator + fdl, index);
         if (mFilePaths == nullptr || ec != std::errc{} || ptr != (mFileDesignator + fdl) || index >= mFilePaths->size())

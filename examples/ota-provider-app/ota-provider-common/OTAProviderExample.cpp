@@ -286,7 +286,14 @@ void OTAProviderExample::SendQueryImageResponse(app::CommandHandler * commandObj
         {
             // Only supporting BDX protocol for now
 
-            VerifyOrDie(mSelectedFileDesignator < mFilePaths.size());
+            // mSelectedFileDesignator is supposed to equal the index of mFilePaths
+            if (mSelectedFileDesignator >= mFilePaths.size())
+            {
+                ChipLogError(SoftwareUpdate, "Invalid file designator: %u", mSelectedFileDesignator);
+                commandObj->AddStatus(commandPath, Status::Failure);
+                return;
+            }
+
             StringBuilder<6> designator;
             designator.Add(static_cast<int>(mSelectedFileDesignator));
             chip::CharSpan fileDesignatorSpan = chip::CharSpan::fromCharString(designator.c_str());
