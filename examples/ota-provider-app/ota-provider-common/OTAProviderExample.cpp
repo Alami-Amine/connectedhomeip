@@ -26,6 +26,7 @@
 #include <crypto/RandUtils.h>
 #include <lib/core/TLV.h>
 #include <lib/support/CHIPMemString.h>
+#include <lib/support/StringBuilder.h>
 #include <protocols/bdx/BdxUri.h>
 
 #include <charconv>
@@ -286,10 +287,11 @@ void OTAProviderExample::SendQueryImageResponse(app::CommandHandler * commandObj
             // Only supporting BDX protocol for now
 
             VerifyOrDie(mSelectedFileDesignator < mFilePaths.size());
+            StringBuilder<6> designator;
+            designator.Add(static_cast<int>(mSelectedFileDesignator));
+            chip::CharSpan fileDesignatorSpan = chip::CharSpan::fromCharString(designator.c_str());
+
             MutableCharSpan uri(mImageUri);
-            char fileDesignatorBuffer[6];
-            int len = std::snprintf(fileDesignatorBuffer, sizeof(fileDesignatorBuffer), "%u", mSelectedFileDesignator);
-            chip::CharSpan fileDesignatorSpan(fileDesignatorBuffer, static_cast<size_t>(len));
             CHIP_ERROR error = chip::bdx::MakeURI(nodeId, fileDesignatorSpan, uri);
             if (error != CHIP_NO_ERROR)
             {
