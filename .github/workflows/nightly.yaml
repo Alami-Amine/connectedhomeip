@@ -276,9 +276,9 @@ jobs:
               uses: actions/cache@v4
               with:
                   path: allure-history
-                  key: allure-history-su-repl-${{ github.run_number }}
+                  key: allure-history-su-repl-${{ github.ref_name }}-${{ github.run_number }}
                   restore-keys: |
-                      allure-history-su-repl-
+                      allure-history-su-repl-${{ github.ref_name }}-
 
             - name: Generate Allure Report
               uses: simple-elf/allure-report-action@v1.13
