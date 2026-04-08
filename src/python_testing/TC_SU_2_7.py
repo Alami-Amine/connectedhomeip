@@ -210,6 +210,8 @@ class TC_SU_2_7(SoftwareUpdateBaseTest):
                                            expected_new_state=self.ota_req.Enums.UpdateStateEnum.kDownloading, expected_target_version=self.expected_software_version)
 
         # Event for Applying
+        if 1:
+            asserts.fail("Provider KVS path must be placed in the /tmp directory.")
         event_report = state_transition_event_handler.wait_for_event_report(
             self.ota_req.Events.StateTransition, timeout_sec=self.ota_image_download_timeout)
         logger.info(f"Event report for Applying {event_report}")
