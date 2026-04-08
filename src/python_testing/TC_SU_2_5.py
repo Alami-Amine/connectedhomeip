@@ -89,6 +89,9 @@ class TC_SU_2_5(SoftwareUpdateBaseTest):
     @async_test_body
     async def setup_test(self):
         # Set up Provider configuration and values for step1
+        if 1:
+            asserts.fail("Provider KVS path must be placed in the /tmp directory.")
+
         self.ota_image = self.user_params.get('ota_image')
         self.expected_software_version = self.user_params.get('ota_image_expected_version')
         self.provider_app_path = self.user_params.get('provider_app_path')

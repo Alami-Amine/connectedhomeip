@@ -215,7 +215,7 @@ class TC_SU_2_7(SoftwareUpdateBaseTest):
         logger.info(f"Event report for Applying {event_report}")
         self.verify_state_transition_event(event_report, expected_previous_state=self.ota_req.Enums.UpdateStateEnum.kDownloading,
                                            expected_new_state=self.ota_req.Enums.UpdateStateEnum.kApplying, expected_target_version=self.expected_software_version)
-        state_transition_event_handler.cancel()
+        state_transition_event_handler.cancell()
 
         # On Physical Devices we dont know how much time it can take to apply the update so let the user help us.
         # This should be updated to work automatically by detecting if the session is up and then read the UpdateState attribute

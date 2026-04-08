@@ -56,17 +56,10 @@ jobs:
 
         # Run on namespace.so instead of `ubuntu-latest`: since compilations are generally CPU
         # bound, we run these on larger/faster machines.
-        runs-on: namespace-profile-4x16
+        runs-on: ubuntu-latest
 
         container:
             image: ghcr.io/project-chip/chip-build:184
-            volumes:
-                - /var/run/nsc/:/var/run/nsc/
-            env:
-                NSC_TOKEN_FILE: ${{ env.NSC_TOKEN_FILE }}
-                NAMESPACE_ACTIONS_RESULTS_URL: ${{ env.NAMESPACE_ACTIONS_RESULTS_URL }}
-                NAMESPACE_ACTIONS_RESULTS_SERVICE: ${{ env.NAMESPACE_ACTIONS_RESULTS_SERVICE }}
-                NAMESPACE_ACTIONS_DIRECT_ZIP_UPLOAD: ${{ env.NAMESPACE_ACTIONS_DIRECT_ZIP_UPLOAD }}
             options: >-
                 --privileged
                 --sysctl net.ipv6.conf.all.disable_ipv6=0
@@ -133,7 +126,7 @@ jobs:
                 tar cfJ repl-build-data.tar.xz out/venv objdir-clone
 
             - name: Upload artifacts for running
-              uses: namespace-actions/upload-artifact@v1
+              uses: actions/upload-artifact@v4
               with:
                 name: repl-build-data
                 path: repl-build-data.tar.xz
@@ -175,17 +168,10 @@ jobs:
             CCACHE_KEY_SUFFIX: ${{ github.event_name == 'workflow_dispatch' && inputs.cache_suffix || '' }}
 
         # Tests are I/O bound, so run on a smaller machine
-        runs-on: namespace-profile-1x2
+        runs-on: ubuntu-latest
 
         container:
             image: ghcr.io/project-chip/chip-build:184
-            volumes:
-                - /var/run/nsc/:/var/run/nsc/
-            env:
-                NSC_TOKEN_FILE: ${{ env.NSC_TOKEN_FILE }}
-                NAMESPACE_ACTIONS_RESULTS_URL: ${{ env.NAMESPACE_ACTIONS_RESULTS_URL }}
-                NAMESPACE_ACTIONS_RESULTS_SERVICE: ${{ env.NAMESPACE_ACTIONS_RESULTS_SERVICE }}
-                NAMESPACE_ACTIONS_DIRECT_ZIP_UPLOAD: ${{ env.NAMESPACE_ACTIONS_DIRECT_ZIP_UPLOAD }}
             options: >-
                 --privileged
                 --sysctl net.ipv6.conf.all.disable_ipv6=0
@@ -203,7 +189,7 @@ jobs:
               uses: ./.github/actions/add-ipv6
 
             - name: Download artifacts for running
-              uses: namespace-actions/download-artifact@v2
+              uses: actions/download-artifact@v4
               with:
                 name: repl-build-data
 
