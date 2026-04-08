@@ -264,7 +264,17 @@ jobs:
 
             - name: Add executor info
               run: |
-                  echo '{"name":"GitHub Actions","type":"github","buildName":"#${{ github.run_number }}","buildUrl":"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"}' > junit-results/executor.json
+                  cat <<EOF > junit-results/executor.json
+                  {
+                    "name": "GitHub Actions",
+                    "type": "github",
+                    "buildName": "#${{ github.run_number }} (${{ github.ref_name }}, $(date -u +%Y-%m-%d))",
+                    "buildOrder": ${{ github.run_number }},
+                    "buildUrl": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+                    "reportName": "Nightly CI - #${{ github.run_number }} (${{ github.ref_name }})"
+                  }
+                  EOF
+                  cat junit-results/executor.json
 
             - name: Generate Allure Report
               uses: simple-elf/allure-report-action@v1.13
