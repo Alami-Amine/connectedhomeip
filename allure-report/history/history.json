@@ -1,1 +1,1 @@
-{}
+{"Nightly CI Tests:Nightly CI Tests#TC_SU_2_5.py":{"statistic":{"failed":1,"broken":0,"skipped":0,"passed":0,"unknown":0,"total":1},"items":[{"uid":"825e0c0d00fae81c","reportUrl":"https://Alami-Amine.github.io/connectedhomeip/12/#testresult/825e0c0d00fae81c","status":"failed","statusDetails":"TC_SU_2_5.py failed","time":{"duration":7013}}]}}
