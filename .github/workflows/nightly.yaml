@@ -284,21 +284,11 @@ jobs:
                   retention-days: 30
                   if-no-files-found: warn
 
-            - name: Prepare Pages deploy
-              if: github.event_name != 'pull_request' && github.event_name != 'merge_group'
-              run: |
-                  cp -r allure-report/* allure-history/
-                  echo "-------------- allure-history top level------------"
-                  ls -la allure-history/
-                  echo "------------ allure-history/last-history ------------"
-                  ls -la allure-history/last-history/ 2>/dev/null || echo "missing"
-                  echo "------------ allure-history/history ------------"
-                  ls -la allure-history/history/ 2>/dev/null || echo "missing"
             - name: Deploy to GitHub Pages
               if: github.event_name != 'pull_request' && github.event_name != 'merge_group'
               uses: peaceiris/actions-gh-pages@v4
               with:
                   github_token: ${{ secrets.GITHUB_TOKEN }}
-                  publish_dir: allure-history
+                  publish_dir: allure-history/allure-report
                   destination_dir: allure-report
                   keep_files: true
