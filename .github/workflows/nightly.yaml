@@ -125,20 +125,6 @@ jobs:
                   ref: gh-pages
                   path: gh-pages
 
-            - name: Add executor info
-              run: |
-                  cat <<EOF > junit-results/executor.json
-                  {
-                    "name": "GitHub Actions",
-                    "type": "github",
-                    "buildName": "#${{ github.run_number }} (${{ github.ref_name }}, $(date -u +%Y-%m-%d))",
-                    "buildOrder": ${{ github.run_number }},
-                    "buildUrl": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
-                    "reportName": "Nightly CI - #${{ github.run_number }} (${{ github.ref_name }})"
-                  }
-                  EOF
-                  cat junit-results/executor.json
-
             - name: Generate Allure Report
               uses: simple-elf/allure-report-action@v1.13
               with:
@@ -148,6 +134,8 @@ jobs:
                   allure_history: allure-history
                   subfolder: allure-report
                   keep_reports: 30
+                  github_run_num: "#${{ github.run_number }} (${{ github.ref_name }}, $CURRENT_DATE)"
+                  report_name: "Nightly CI Tests #${{ github.run_number }} (${{ github.ref_name }})"
 
             - name: Upload Allure Report
               uses: actions/upload-artifact@v7
