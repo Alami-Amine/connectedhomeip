@@ -1,4 +1,0 @@
-"DESCRIPTION","DURATION IN MS","NAME","PARENT SUITE","START TIME","STATUS","STOP TIME","SUB SUITE","SUITE","TEST CLASS","TEST METHOD"
-"","3200","TC_SU_2_7_test_pass","","","passed","","","Nightly CI Tests","TC_SU_2_7",""
-"","5000","TC_SU_2_5_test_pass","","","passed","","","Nightly CI Tests","TC_SU_2_5",""
-"","5500","TC_SU_2_5_test_fail","","","failed","","","Nightly CI Tests","TC_SU_2_5",""

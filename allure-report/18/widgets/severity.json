@@ -1,1 +1,0 @@
-[{"uid":"846f3010a19b5b51","name":"TC_SU_2_7_test_pass","time":{"duration":3200},"status":"passed","severity":"normal"},{"uid":"f19e9f54ea8ca623","name":"TC_SU_2_5_test_pass","time":{"duration":5000},"status":"passed","severity":"normal"},{"uid":"d2b6a7014e10e436","name":"TC_SU_2_5_test_fail","time":{"duration":5500},"status":"failed","severity":"normal"}]
