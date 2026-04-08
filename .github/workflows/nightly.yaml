@@ -125,6 +125,9 @@ jobs:
                   ref: gh-pages
                   path: gh-pages
 
+            - name: Set current date
+              run: echo "CURRENT_DATE=$(date -u +%Y-%m-%d)" >> $GITHUB_ENV
+
             - name: Generate Allure Report
               uses: simple-elf/allure-report-action@v1.13
               with:
@@ -134,8 +137,7 @@ jobs:
                   allure_history: allure-history
                   subfolder: allure-report
                   keep_reports: 30
-                  github_run_num: "#${{ github.run_number }} (${{ github.ref_name }}, $CURRENT_DATE)"
-                  report_name: "Nightly CI Tests #${{ github.run_number }} (${{ github.ref_name }})"
+                  report_name: "Nightly CI Tests #${{ github.run_number }} (${{ github.ref_name }}, ${{ env.CURRENT_DATE }})"
 
             - name: Upload Allure Report
               uses: actions/upload-artifact@v7
