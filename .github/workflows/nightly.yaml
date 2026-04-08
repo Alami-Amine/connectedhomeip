@@ -125,19 +125,39 @@ jobs:
                   ref: gh-pages
                   path: gh-pages
 
-            - name: Set current date
-              run: echo "CURRENT_DATE=$(date -u +%Y-%m-%d)" >> $GITHUB_ENV
+            - name: Install Allure CLI
+              run: npm install -g allure-commandline
+
+            - name: Prepare Allure results
+              run: |
+                  # Copy history from previous gh-pages deploy
+                  cp -r gh-pages/allure-report/last-history/. junit-results/history 2>/dev/null || true
+
+                  # Write executor info
+                  CURRENT_DATE=$(date -u +%Y-%m-%d)
+                  cat <<EOF > junit-results/executor.json
+                  {
+                    "name": "GitHub Actions",
+                    "type": "github",
+                    "buildName": "#${{ github.run_number }} (${{ github.ref_name }}, ${CURRENT_DATE})",
+                    "buildOrder": ${{ github.run_number }},
+                    "buildUrl": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+                    "reportName": "Nightly CI Tests"
+                  }
+                  EOF
 
             - name: Generate Allure Report
-              uses: simple-elf/allure-report-action@v1.13
-              with:
-                  allure_results: junit-results
-                  allure_report: allure-report
-                  gh_pages: gh-pages
-                  allure_history: allure-history
-                  subfolder: allure-report
-                  keep_reports: 30
-                  report_name: "Nightly CI Tests #${{ github.run_number }} (${{ github.ref_name }}, ${{ env.CURRENT_DATE }})"
+              run: allure generate junit-results -o allure-report --clean
+
+            - name: Prepare deploy directory
+              run: |
+                  mkdir -p allure-deploy/allure-report
+                  # Copy report as numbered archive
+                  cp -r allure-report allure-deploy/allure-report/${{ github.run_number }}
+                  # Save history for next run
+                  cp -r allure-report/history allure-deploy/allure-report/last-history
+                  # Redirect index to latest report
+                  echo '<!DOCTYPE html><meta charset="utf-8"><meta http-equiv="refresh" content="0; URL=${{ github.run_number }}/index.html">' > allure-deploy/allure-report/index.html
 
             - name: Upload Allure Report
               uses: actions/upload-artifact@v7
@@ -152,6 +172,6 @@ jobs:
               uses: peaceiris/actions-gh-pages@v4
               with:
                   github_token: ${{ secrets.GITHUB_TOKEN }}
-                  publish_dir: allure-history/allure-report
+                  publish_dir: allure-deploy/allure-report
                   destination_dir: allure-report
                   keep_files: true
