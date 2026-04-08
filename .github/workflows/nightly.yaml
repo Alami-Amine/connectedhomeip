@@ -48,9 +48,7 @@ env:
 jobs:
     su_repl_tests_linux_build:
         name: REPL Tests - Linux Software Update (BUILD)
-        if: |
-            github.actor != 'restyled-io[bot]' &&
-            (github.ref == 'refs/heads/master' || github.event_name == 'pull_request')
+        if: github.actor != 'restyled-io[bot]'
         env:
             BUILD_VARIANT: ipv6only-no-ble-no-wifi
             DISABLE_CCACHE: ${{ (github.event_name == 'workflow_dispatch' && inputs.disable_ccache == 'true') && 'true' || (contains(github.event.head_commit.message, '[no-ccache]') && 'true') || 'false' }}
@@ -272,19 +270,22 @@ jobs:
                   detailed_summary: true
                   require_tests: false
 
-            - name: Load Allure test report history
-              uses: actions/cache@v4
+            - name: Checkout gh-pages for Allure history
+              uses: actions/checkout@v6
               with:
-                  path: allure-history
-                  key: allure-history-su-repl-${{ github.ref_name }}-${{ github.run_number }}
-                  restore-keys: |
-                      allure-history-su-repl-${{ github.ref_name }}-
+                  ref: gh-pages
+                  path: gh-pages
+
+            - name: Add executor info
+              run: |
+                  echo '{"name":"GitHub Actions","type":"github","buildName":"#${{ github.run_number }}","buildUrl":"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"}' > junit-results/executor.json
 
             - name: Generate Allure Report
               uses: simple-elf/allure-report-action@v1.13
               with:
                   allure_results: junit-results
                   allure_report: allure-report
+                  gh_pages: gh-pages
                   allure_history: allure-history
                   keep_reports: 30
 
