@@ -131,10 +131,18 @@ jobs:
             - name: Prepare Allure results
               run: |
                   # Copy history from previous gh-pages deploy
+                  echo "=== gh-pages/allure-report contents ==="
+                  ls -la gh-pages/allure-report/ 2>/dev/null || echo "no allure-report dir"
+                  echo "=== gh-pages/allure-report/last-history contents ==="
+                  ls -la gh-pages/allure-report/last-history/ 2>/dev/null || echo "no last-history dir"
+                  mkdir -p junit-results/history
                   cp -r gh-pages/allure-report/last-history/. junit-results/history 2>/dev/null || true
+                  echo "=== junit-results/history contents ==="
+                  ls -la junit-results/history/ 2>/dev/null || echo "no history copied"
 
                   # Write executor info
                   CURRENT_DATE=$(date -u +%Y-%m-%d)
+                  PAGES_URL="https://${{ github.repository_owner }}.github.io/${GITHUB_REPOSITORY#*/}/allure-report"
                   cat <<EOF > junit-results/executor.json
                   {
                     "name": "GitHub Actions",
@@ -142,7 +150,9 @@ jobs:
                     "buildName": "#${{ github.run_number }} (${{ github.ref_name }}, ${CURRENT_DATE})",
                     "buildOrder": ${{ github.run_number }},
                     "buildUrl": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
-                    "reportName": "Nightly CI Tests"
+                    "reportName": "Nightly CI Tests",
+                    "url": "${PAGES_URL}",
+                    "reportUrl": "${PAGES_URL}/${{ github.run_number }}"
                   }
                   EOF
 
