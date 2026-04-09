@@ -1,0 +1,1 @@
+[{"uid":"9064b57c6da09328","name":"TC_SU_2_5_test_pass","time":{"start":1775770964000,"stop":1775770969000,"duration":5000},"status":"passed","severity":"normal"},{"uid":"fcc104f579cf02c0","name":"TC_SU_2_5_test_fail","time":{"start":1775770964000,"stop":1775770969500,"duration":5500},"status":"failed","severity":"normal"}]
