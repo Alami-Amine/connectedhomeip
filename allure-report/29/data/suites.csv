@@ -1,0 +1,4 @@
+"DESCRIPTION","DURATION IN MS","NAME","PARENT SUITE","START TIME","STATUS","STOP TIME","SUB SUITE","SUITE","TEST CLASS","TEST METHOD"
+"","5000","TC_SU_2_5_test_pass","","Thu Apr 09 11:36:53 UTC 2026","passed","Thu Apr 09 11:36:58 UTC 2026","","Nightly CI Tests","TC_SU_2_5",""
+"","3200","TC_SU_2_7_test_pass","","Thu Apr 09 11:36:53 UTC 2026","passed","Thu Apr 09 11:36:56 UTC 2026","","Nightly CI Tests","TC_SU_2_7",""
+"","5500","TC_SU_2_5_test_fail","","Thu Apr 09 11:36:53 UTC 2026","failed","Thu Apr 09 11:36:58 UTC 2026","","Nightly CI Tests","TC_SU_2_5",""
