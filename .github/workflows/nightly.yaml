@@ -59,11 +59,12 @@ jobs:
             - name: Generate fake JUnit XML
               run: |
                   mkdir -p out/junit-results
+                  TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%S)
                   if [ "${{ matrix.filter }}" = "TC_SU_2_5" ]; then
-                    cat > out/junit-results/${{ matrix.filter }}-results.xml <<'XMLEOF'
+                    cat > out/junit-results/${{ matrix.filter }}-results.xml <<XMLEOF
                   <?xml version="1.0" encoding="UTF-8"?>
                   <testsuites>
-                    <testsuite name="Nightly CI Tests" tests="2" failures="1" errors="0" time="10.5">
+                    <testsuite name="Nightly CI Tests" tests="2" failures="1" errors="0" time="10.5" timestamp="${TIMESTAMP}">
                       <testcase name="TC_SU_2_5_test_pass" classname="TC_SU_2_5" time="5.0"/>
                       <testcase name="TC_SU_2_5_test_fail" classname="TC_SU_2_5" time="5.5">
                         <failure message="Fake failure for testing">This is a fake failure to test the reporting pipeline.</failure>
@@ -72,10 +73,10 @@ jobs:
                   </testsuites>
                   XMLEOF
                   else
-                    cat > out/junit-results/${{ matrix.filter }}-results.xml <<'XMLEOF'
+                    cat > out/junit-results/${{ matrix.filter }}-results.xml <<XMLEOF
                   <?xml version="1.0" encoding="UTF-8"?>
                   <testsuites>
-                    <testsuite name="Nightly CI Tests" tests="1" failures="0" errors="0" time="3.2">
+                    <testsuite name="Nightly CI Tests" tests="1" failures="0" errors="0" time="3.2" timestamp="${TIMESTAMP}">
                       <testcase name="TC_SU_2_7_test_pass" classname="TC_SU_2_7" time="3.2"/>
                     </testsuite>
                   </testsuites>
