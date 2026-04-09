@@ -73,14 +73,7 @@ jobs:
                   </testsuites>
                   XMLEOF
                   else
-                    cat > out/junit-results/${{ matrix.filter }}-results.xml <<XMLEOF
-                  <?xml version="1.0" encoding="UTF-8"?>
-                  <testsuites>
-                    <testsuite name="Nightly CI Tests" tests="1" failures="0" errors="0" time="3.2" timestamp="${TIMESTAMP}">
-                      <testcase name="TC_SU_2_7_test_pass" classname="TC_SU_2_7" time="3.2"/>
-                    </testsuite>
-                  </testsuites>
-                  XMLEOF
+                    echo test
                   fi
 
             - name: Upload JUnit XML Results
