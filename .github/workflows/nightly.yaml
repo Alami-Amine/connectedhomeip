@@ -133,15 +133,15 @@ jobs:
                   allure_report: allure-report
                   gh_pages: gh-pages
                   allure_history: allure-history
-                  subfolder: allure-report
+                  subfolder: allure-report/nightly
                   keep_reports: 30
                   # This is the name that will show up in the Dashboard Overview
-                  report_name: "Nightly CI Tests"
+                  report_name: "CI Tests"
 
             - name: Upload Allure Report
               uses: actions/upload-artifact@v7
               with:
-                  name: allure-report-su-repl
+                  name: allure-report-nightly
                   path: allure-report
                   retention-days: 30
                   if-no-files-found: warn
@@ -151,6 +151,6 @@ jobs:
               uses: peaceiris/actions-gh-pages@v4
               with:
                   github_token: ${{ secrets.GITHUB_TOKEN }}
-                  publish_dir: allure-history/allure-report
-                  destination_dir: allure-report
+                  publish_dir: allure-history/allure-report/nightly
+                  destination_dir: allure-report/nightly
                   keep_files: true
