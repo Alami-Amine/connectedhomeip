@@ -12,14 +12,115 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import hashlib
 import os
 import shlex
+import subprocess
 from enum import Enum, auto
 from platform import uname
 from typing import Optional
 
 from .builder import BuilderOutput
 from .gn import GnBuilder
+
+
+_MSAN_DEFAULT_SYSROOT = os.path.expanduser('~/.cache/matter/msan_sysroot')
+_MSAN_REPO_SYSROOT = 'msan_sysroot'
+_MSAN_BUILD_SCRIPT = 'scripts/build/build_msan_sysroot.sh'
+_MSAN_IGNORELIST = 'msan_ignorelist.txt'
+_MSAN_STAMP_NAME = '.build_complete'
+
+
+def _msan_sysroot_path(chip_root: str) -> str:
+    if 'SYSROOT_MSAN' in os.environ:
+        return os.path.abspath(os.environ['SYSROOT_MSAN'])
+
+    repo_sysroot = os.path.join(chip_root, _MSAN_REPO_SYSROOT)
+    if os.path.exists(repo_sysroot):
+        return os.path.abspath(repo_sysroot)
+
+    return os.path.abspath(_MSAN_DEFAULT_SYSROOT)
+
+
+def _msan_compute_input_hash(chip_root: str) -> Optional[str]:
+    """Computes the hash that build_msan_sysroot.sh writes into its stamp.
+
+    Must stay byte-identical with the bash compute_input_hash() in
+    build_msan_sysroot.sh, otherwise the freshness check yields false
+    staleness reports.
+
+    Returns None if any input is missing (e.g. clang not bootstrapped yet);
+    the caller treats that as "cannot verify, surface a clearer error."
+    """
+    script_path = os.path.join(chip_root, _MSAN_BUILD_SCRIPT)
+    ignorelist_path = os.path.join(chip_root, _MSAN_IGNORELIST)
+    clang_path = os.path.join(chip_root, '.environment/cipd/packages/pigweed/bin/clang')
+
+    if not all(os.path.isfile(p) for p in [script_path, ignorelist_path, clang_path]):
+        return None
+
+    parts = []
+    for path in [script_path, ignorelist_path]:
+        with open(path, 'rb') as f:
+            parts.append(hashlib.sha256(f.read()).hexdigest() + '\n')
+    try:
+        parts.append(subprocess.check_output([clang_path, '--version'], text=True))
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return None
+    return hashlib.sha256(''.join(parts).encode()).hexdigest()
+
+
+def _msan_validate_sysroot(chip_root: str) -> None:
+    """Fail fast with actionable instructions if the MSAN sysroot is missing
+    or stale. Called when an MSAN build is requested.
+
+    The user opts in to the (~30 min) sysroot build explicitly; we never
+    auto-trigger it from build_examples.py because the cost is too large to
+    hide behind an unrelated build invocation.
+    """
+    sysroot = _msan_sysroot_path(chip_root)
+    stamp = os.path.join(sysroot, _MSAN_STAMP_NAME)
+    build_cmd = f'{_MSAN_BUILD_SCRIPT}'
+
+    if not os.path.isfile(stamp):
+        raise Exception(
+            f'MSAN builds require a completed instrumented sysroot at:\n'
+            f'    {sysroot}\n'
+            f'\n'
+            f'Build it with:\n'
+            f'    {build_cmd}\n'
+            f'\n'
+            f'First-time build takes ~20-40 minutes; subsequent invocations\n'
+            f'are no-ops as long as the inputs (script, ignorelist, clang)\n'
+            f'have not changed.\n'
+            f'\n'
+            f'To install to a different location:\n'
+            f'    {build_cmd} --out-dir <path>\n'
+            f'\n'
+            f'Then either keep the generated {os.path.join(chip_root, _MSAN_REPO_SYSROOT)} symlink,\n'
+            f'or export SYSROOT_MSAN=<path> before building.\n'
+        )
+
+    expected_hash = _msan_compute_input_hash(chip_root)
+    if expected_hash is None:
+        # Could not compute (likely clang missing). Skip the freshness check
+        # and let the build proceed; a missing clang will fail with its
+        # own error later.
+        return
+
+    with open(stamp) as f:
+        stored_hash = f.read().strip()
+    if stored_hash != expected_hash:
+        raise Exception(
+            f'MSAN sysroot at {sysroot} is stale.\n'
+            f'\n'
+            f'One of the inputs (build script, msan_ignorelist.txt, or clang\n'
+            f'version) has changed since the sysroot was built. Stale\n'
+            f'instrumentation produces unreliable MSAN reports.\n'
+            f'\n'
+            f'Rebuild with:\n'
+            f'    {build_cmd}\n'
+        )
 
 
 class HostCryptoLibrary(Enum):
@@ -399,7 +500,7 @@ class HostBuilder(GnBuilder):
 
     def __init__(self, root, runner, app: HostApp, board=HostBoard.NATIVE,
                  enable_ipv4=True, enable_ble=True, enable_wifi=True, enable_wifipaf=True,
-                 enable_groupcast=True, enable_thread=True, use_tsan=False, use_asan=False, use_ubsan=False,
+                 enable_groupcast=True, enable_thread=True, use_tsan=False, use_asan=False, use_ubsan=False, use_msan=False,
                  separate_event_loop=True, fuzzing_type: HostFuzzingType = HostFuzzingType.NONE, use_clang=False,
                  interactive_mode=True, extra_tests=False, use_nl_fault_injection=False, use_platform_mdns=False, enable_rpcs=False,
                  use_coverage=False, use_dmalloc=False, minmdns_address_policy=None,
@@ -423,6 +524,13 @@ class HostBuilder(GnBuilder):
            - unified: build will happen in a SINGLE output directory instead of separated out
                       into per-target directories. Directory name will be "unified"
         """
+
+        # MSAN requires an instrumented sysroot. Validate before any other
+        # build setup so the user sees the "build the sysroot first" error
+        # immediately, while `root` still points at CHIP_ROOT.
+        chip_root = os.path.abspath(root)
+        if use_msan and not runner.dry_run:
+            _msan_validate_sysroot(chip_root)
 
         # Unified builds use the top level root for compilation
         if not unified:
@@ -478,6 +586,11 @@ class HostBuilder(GnBuilder):
 
         if use_ubsan:
             self.extra_gn_options.append('is_ubsan=true')
+
+        if use_msan:
+            self.extra_gn_options.append('is_msan=true')
+            self.extra_gn_options.append('is_clang=true')
+            self.extra_gn_options.append('msan_sysroot="%s"' % _msan_sysroot_path(chip_root))
 
         if use_dmalloc:
             self.extra_gn_options.append('chip_config_memory_debug_checks=true')

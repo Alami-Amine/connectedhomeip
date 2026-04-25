@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import("//build_overrides/build.gni")
+import("//build_overrides/chip.gni")
 import("//build_overrides/pigweed.gni")
 import("//build_overrides/pigweed_environment.gni")
 import("${build_root}/chip/java/config.gni")
@@ -44,6 +45,9 @@ declare_args() {
 
   # Enable memory sanitizer
   is_msan = false
+
+  # MSAN builds need an instrumented C++ runtime and dependencies.
+  msan_sysroot = "${chip_root}/msan_sysroot"
 
   # enable undefined behavior sanitizer
   is_ubsan = false
@@ -473,9 +477,24 @@ config("sanitize_memory") {
     "-fsanitize=memory",
     "-fsanitize-memory-track-origins",
     "-fno-omit-frame-pointer",
-  ]
-  ldflags = cflags
+    "-fsanitize-ignorelist=" +
+        rebase_path("${chip_root}/msan_ignorelist.txt", root_build_dir),
+    "-nostdinc++",
+    "-isystem",
+    rebase_path("${msan_sysroot}/include/c++/v1", root_build_dir),
 
+    # TODO: Re-enable -O0 once other MSAN errors are resolved.
+    "-O1",  # Reduces stack frame sizes vs -O0, helps avoid MSan stack overflows
+  ]
+  ldflags = [
+    "-fsanitize=memory",
+    "-fsanitize-memory-track-origins",
+    "-fno-omit-frame-pointer",
+    "-nostdlib++",
+    "-L" + rebase_path("${msan_sysroot}/lib", root_build_dir),
+    "-lc++",
+    "-lc++abi",
+  ]
   defines = [ "CHIP_MEMORY_SANITIZER_ENABLED=1" ]
 }
 
