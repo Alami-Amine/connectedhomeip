@@ -37,7 +37,7 @@ set -euo pipefail
 CHIP_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 PW_CLANG="$CHIP_ROOT/.environment/cipd/packages/pigweed/bin"
 DEFAULT_SYSROOT="$HOME/.cache/matter/msan_sysroot"
-IGNORELIST="$CHIP_ROOT/msan_ignorelist.txt"
+IGNORELIST="$CHIP_ROOT/build/config/compiler/msan_ignorelist.txt"
 SCRIPT_PATH="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
 SRC="${TMPDIR:-/tmp}/msan-build"
 MSAN="-fsanitize=memory -fsanitize-memory-track-origins -fno-omit-frame-pointer -fPIC"
@@ -63,9 +63,9 @@ The script is idempotent: if the sysroot is already built and its inputs
 (this script, msan_ignorelist.txt, clang version) have not changed, it
 exits in milliseconds. A first-time build takes 15-30 minutes.
 
-After a successful build, a symlink is created at:
-  \$CHIP_ROOT/msan_sysroot -> <sysroot>
-This is the path that build/config/compiler/BUILD.gn references.
+build_examples.py reads the resolved sysroot path via host.py and passes
+it to GN as msan_sysroot="<path>". Raw \`gn gen\` users must export
+SYSROOT_MSAN or pass --args='msan_sysroot="..."' explicitly.
 EOF
 }
 
@@ -129,8 +129,6 @@ fi
 # Stamp check: short-circuit if up-to-date.
 if [[ "$FORCE" -eq 0 ]] && [[ -f "$STAMP" ]] && [[ "$(cat "$STAMP")" == "$EXPECTED_HASH" ]]; then
     echo "MSAN sysroot up-to-date at $SYSROOT"
-    # Refresh the symlink in case the sysroot was built from a different clone.
-    ln -sfn "$SYSROOT" "$CHIP_ROOT/msan_sysroot"
     exit 0
 fi
 
@@ -148,7 +146,6 @@ fi
 # have completed the build while we were blocked.
 if [[ "$FORCE" -eq 0 ]] && [[ -f "$STAMP" ]] && [[ "$(cat "$STAMP")" == "$EXPECTED_HASH" ]]; then
     echo "MSAN sysroot built by concurrent process; reusing"
-    ln -sfn "$SYSROOT" "$CHIP_ROOT/msan_sysroot"
     exit 0
 fi
 
@@ -246,9 +243,6 @@ meson setup builddir --native-file "$SRC/msan-native.ini" --prefix="$SYSROOT" \
     -Dintrospection=disabled -Ddtrace=false -Dsystemtap=false \
     -Dman-pages=disabled -Ddocumentation=false -Dbsymbolic_functions=false
 ninja -C builddir -j"$(nproc)" && ninja -C builddir install
-
-# Symlink at chip_root for build/config/compiler/BUILD.gn to find.
-ln -sfn "$SYSROOT" "$CHIP_ROOT/msan_sysroot"
 
 # Stamp file written last; only exists on full success.
 echo "$EXPECTED_HASH" > "$STAMP"
