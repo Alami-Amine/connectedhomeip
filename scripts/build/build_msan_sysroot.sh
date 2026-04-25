@@ -44,13 +44,15 @@ MSAN="-fsanitize=memory -fsanitize-memory-track-origins -fno-omit-frame-pointer 
 
 usage() {
     cat <<EOF
-Usage: $(basename "$0") [--out-dir PATH] [--force] [--help]
+Usage: $(basename "$0") [--out-dir PATH] [--force] [--check] [--help]
 
 Builds an MSan-instrumented sysroot for Matter MSAN tests.
 
 Options:
   --out-dir PATH   Install sysroot to PATH (overrides SYSROOT_MSAN)
   --force          Rebuild even if the existing sysroot is current
+  --check          Report freshness only; exit 0 if current, 2 if missing,
+                   3 if stale. Does not start a build.
   --help           Show this message
 
 Environment:
@@ -68,11 +70,13 @@ EOF
 }
 
 FORCE=0
+CHECK_ONLY=0
 OUT_DIR=""
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --out-dir) OUT_DIR="$2"; shift 2 ;;
         --force) FORCE=1; shift ;;
+        --check) CHECK_ONLY=1; shift ;;
         --help|-h) usage; exit 0 ;;
         *) echo "Unknown argument: $1" >&2; usage >&2; exit 1 ;;
     esac
@@ -106,6 +110,21 @@ compute_input_hash() {
 }
 
 EXPECTED_HASH="$(compute_input_hash)"
+
+# --check mode: report sysroot freshness for callers (e.g. host.py) and exit.
+# Exit 0 on fresh, 2 on missing stamp, 3 on stale stamp. No build is started.
+if [[ "$CHECK_ONLY" -eq 1 ]]; then
+    if [[ ! -f "$STAMP" ]]; then
+        echo "MSAN sysroot missing at $SYSROOT (no stamp file)" >&2
+        exit 2
+    fi
+    if [[ "$(cat "$STAMP")" != "$EXPECTED_HASH" ]]; then
+        echo "MSAN sysroot stale at $SYSROOT (inputs changed since build)" >&2
+        exit 3
+    fi
+    echo "MSAN sysroot OK at $SYSROOT"
+    exit 0
+fi
 
 # Stamp check: short-circuit if up-to-date.
 if [[ "$FORCE" -eq 0 ]] && [[ -f "$STAMP" ]] && [[ "$(cat "$STAMP")" == "$EXPECTED_HASH" ]]; then

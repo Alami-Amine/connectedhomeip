@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import hashlib
 import os
 import shlex
 import subprocess
@@ -25,101 +24,49 @@ from .gn import GnBuilder
 
 
 _MSAN_DEFAULT_SYSROOT = os.path.expanduser('~/.cache/matter/msan_sysroot')
-_MSAN_REPO_SYSROOT = 'msan_sysroot'
 _MSAN_BUILD_SCRIPT = 'scripts/build/build_msan_sysroot.sh'
-_MSAN_IGNORELIST = 'msan_ignorelist.txt'
-_MSAN_STAMP_NAME = '.build_complete'
 
 
 def _msan_sysroot_path(chip_root: str) -> str:
+    """Resolve the MSAN sysroot path that GN will reference.
+
+    Order: SYSROOT_MSAN env var, then the repo-root msan_sysroot symlink
+    (created by the build script), then the default cache location.
+    """
     if 'SYSROOT_MSAN' in os.environ:
         return os.path.abspath(os.environ['SYSROOT_MSAN'])
 
-    repo_sysroot = os.path.join(chip_root, _MSAN_REPO_SYSROOT)
+    repo_sysroot = os.path.join(chip_root, 'msan_sysroot')
     if os.path.exists(repo_sysroot):
         return os.path.abspath(repo_sysroot)
 
     return os.path.abspath(_MSAN_DEFAULT_SYSROOT)
 
 
-def _msan_compute_input_hash(chip_root: str) -> Optional[str]:
-    """Computes the hash that build_msan_sysroot.sh writes into its stamp.
-
-    Must stay byte-identical with the bash compute_input_hash() in
-    build_msan_sysroot.sh, otherwise the freshness check yields false
-    staleness reports.
-
-    Returns None if any input is missing (e.g. clang not bootstrapped yet);
-    the caller treats that as "cannot verify, surface a clearer error."
-    """
-    script_path = os.path.join(chip_root, _MSAN_BUILD_SCRIPT)
-    ignorelist_path = os.path.join(chip_root, _MSAN_IGNORELIST)
-    clang_path = os.path.join(chip_root, '.environment/cipd/packages/pigweed/bin/clang')
-
-    if not all(os.path.isfile(p) for p in [script_path, ignorelist_path, clang_path]):
-        return None
-
-    parts = []
-    for path in [script_path, ignorelist_path]:
-        with open(path, 'rb') as f:
-            parts.append(hashlib.sha256(f.read()).hexdigest() + '\n')
-    try:
-        parts.append(subprocess.check_output([clang_path, '--version'], text=True))
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        return None
-    return hashlib.sha256(''.join(parts).encode()).hexdigest()
-
-
 def _msan_validate_sysroot(chip_root: str) -> None:
-    """Fail fast with actionable instructions if the MSAN sysroot is missing
-    or stale. Called when an MSAN build is requested.
+    """Fail fast if the MSAN sysroot is missing or stale.
 
-    The user opts in to the (~30 min) sysroot build explicitly; we never
-    auto-trigger it from build_examples.py because the cost is too large to
-    hide behind an unrelated build invocation.
+    Delegates the freshness check to build_msan_sysroot.sh --check so the
+    hash logic has a single source of truth in bash. Passes the resolved
+    sysroot path explicitly so the script checks the same one GN will use.
     """
     sysroot = _msan_sysroot_path(chip_root)
-    stamp = os.path.join(sysroot, _MSAN_STAMP_NAME)
-    build_cmd = f'{_MSAN_BUILD_SCRIPT}'
-
-    if not os.path.isfile(stamp):
+    script = os.path.join(chip_root, _MSAN_BUILD_SCRIPT)
+    result = subprocess.run(
+        [script, '--out-dir', sysroot, '--check'],
+        capture_output=True, text=True,
+    )
+    if result.returncode != 0:
         raise Exception(
-            f'MSAN builds require a completed instrumented sysroot at:\n'
-            f'    {sysroot}\n'
+            f'MSAN sysroot check failed (exit {result.returncode}):\n'
+            f'  stderr: {result.stderr.strip() or "<empty>"}\n'
+            f'  stdout: {result.stdout.strip() or "<empty>"}\n'
             f'\n'
             f'Build it with:\n'
-            f'    {build_cmd}\n'
+            f'    {_MSAN_BUILD_SCRIPT}\n'
             f'\n'
-            f'First-time build takes ~20-40 minutes; subsequent invocations\n'
-            f'are no-ops as long as the inputs (script, ignorelist, clang)\n'
-            f'have not changed.\n'
-            f'\n'
-            f'To install to a different location:\n'
-            f'    {build_cmd} --out-dir <path>\n'
-            f'\n'
-            f'Then either keep the generated {os.path.join(chip_root, _MSAN_REPO_SYSROOT)} symlink,\n'
-            f'or export SYSROOT_MSAN=<path> before building.\n'
-        )
-
-    expected_hash = _msan_compute_input_hash(chip_root)
-    if expected_hash is None:
-        # Could not compute (likely clang missing). Skip the freshness check
-        # and let the build proceed; a missing clang will fail with its
-        # own error later.
-        return
-
-    with open(stamp) as f:
-        stored_hash = f.read().strip()
-    if stored_hash != expected_hash:
-        raise Exception(
-            f'MSAN sysroot at {sysroot} is stale.\n'
-            f'\n'
-            f'One of the inputs (build script, msan_ignorelist.txt, or clang\n'
-            f'version) has changed since the sysroot was built. Stale\n'
-            f'instrumentation produces unreliable MSAN reports.\n'
-            f'\n'
-            f'Rebuild with:\n'
-            f'    {build_cmd}\n'
+            f'First-time build: ~20-40 min; subsequent invocations are no-ops.\n'
+            f'Override path with: export SYSROOT_MSAN=<path>'
         )
 
 
