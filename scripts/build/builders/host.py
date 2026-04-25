@@ -15,6 +15,7 @@
 import os
 import shlex
 import subprocess
+import sys
 from enum import Enum, auto
 from platform import uname
 from typing import Optional
@@ -49,6 +50,9 @@ def _msan_validate_sysroot(chip_root: str) -> None:
     Delegates the freshness check to build_msan_sysroot.sh --check so the
     hash logic has a single source of truth in bash. Passes the resolved
     sysroot path explicitly so the script checks the same one GN will use.
+
+    Exits via sys.exit() rather than raising so the user sees a clean
+    actionable message instead of a click/builder traceback.
     """
     sysroot = _msan_sysroot_path(chip_root)
     script = os.path.join(chip_root, _MSAN_BUILD_SCRIPT)
@@ -56,18 +60,22 @@ def _msan_validate_sysroot(chip_root: str) -> None:
         [script, '--out-dir', sysroot, '--check'],
         capture_output=True, text=True,
     )
-    if result.returncode != 0:
-        raise Exception(
-            f'MSAN sysroot check failed (exit {result.returncode}):\n'
-            f'  stderr: {result.stderr.strip() or "<empty>"}\n'
-            f'  stdout: {result.stdout.strip() or "<empty>"}\n'
-            f'\n'
-            f'Build it with:\n'
-            f'    {_MSAN_BUILD_SCRIPT}\n'
-            f'\n'
-            f'First-time build: ~20-40 min; subsequent invocations are no-ops.\n'
-            f'Override path with: export SYSROOT_MSAN=<path>'
-        )
+    if result.returncode == 0:
+        return
+
+    detail = result.stderr.strip() or result.stdout.strip() or '<no output>'
+    print(
+        '\n'
+        f'MSAN sysroot check failed: {detail}\n'
+        '\n'
+        'Build it with:\n'
+        f'    {_MSAN_BUILD_SCRIPT}\n'
+        '\n'
+        'First-time build: ~20-40 min; subsequent invocations are no-ops.\n'
+        'Override path with: export SYSROOT_MSAN=<path>',
+        file=sys.stderr,
+    )
+    sys.exit(result.returncode)
 
 
 class HostCryptoLibrary(Enum):
