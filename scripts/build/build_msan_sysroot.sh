@@ -22,7 +22,7 @@
 #
 # Idempotent: if the sysroot is already built and its inputs (this script,
 # msan_ignorelist.txt, clang version) have not changed, the script exits
-# in milliseconds. First-time build takes ~20-40 minutes.
+# in milliseconds. First-time build takes ~15-30 minutes.
 #
 # Prerequisites: source scripts/activate.sh
 #
@@ -61,7 +61,7 @@ Environment:
 
 The script is idempotent: if the sysroot is already built and its inputs
 (this script, msan_ignorelist.txt, clang version) have not changed, it
-exits in milliseconds. A first-time build takes 20-40 minutes.
+exits in milliseconds. A first-time build takes 15-30 minutes.
 
 After a successful build, a symlink is created at:
   \$CHIP_ROOT/msan_sysroot -> <sysroot>
@@ -162,7 +162,7 @@ trap on_error ERR
 
 LLVM_COMMIT=$("$PW_CLANG/clang" --version | grep -oP '[0-9a-f]{40}')
 
-echo ">>> Building MSAN sysroot at $SYSROOT (this takes 20-40 min)"
+echo ">>> Building MSAN sysroot at $SYSROOT (this takes 15-30 min)"
 
 # libc++ / libc++abi (MSan-instrumented)
 echo ">>> libc++ / libc++abi"

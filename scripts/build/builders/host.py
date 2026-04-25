@@ -68,10 +68,14 @@ def _msan_validate_sysroot(chip_root: str) -> None:
         '\n'
         f'MSAN sysroot check failed: {detail}\n'
         '\n'
+        'MSAN needs every dependency (libc++, libc++abi, OpenSSL, etc.)\n'
+        'compiled with -fsanitize=memory; uninstrumented code triggers\n'
+        'false positives.\n'
+        '\n'
         'Build it with:\n'
         f'    {_MSAN_BUILD_SCRIPT}\n'
         '\n'
-        'First-time build: ~20-40 min; subsequent invocations are no-ops.\n'
+        'First-time build: ~15-30 min, ~2 GB on disk; subsequent invocations are no-ops.\n'
         'Override path with: export SYSROOT_MSAN=<path>',
         file=sys.stderr,
     )
@@ -499,6 +503,8 @@ class HostBuilder(GnBuilder):
         self.build_env = {}
         self.fuzzing_type = fuzzing_type
         self.unified = unified
+        self.use_msan = use_msan
+        self.chip_root = chip_root
 
         if enable_rpcs:
             self.extra_gn_options.append('import("//with_pw_rpc.gni")')
@@ -743,6 +749,17 @@ class HostBuilder(GnBuilder):
         if self.board == HostBoard.ARM64:
             self.build_env['PKG_CONFIG_PATH'] = os.path.join(
                 self.SysRootPath('SYSROOT_AARCH64'), 'lib/aarch64-linux-gnu/pkgconfig')
+        if self.use_msan:
+            # Steer pkg-config to the instrumented OpenSSL/zlib/glib/etc. in
+            # the MSAN sysroot. Without this, Matter's GN config picks up the
+            # system libcrypto.so.3 at link time, and MSAN reports endless
+            # false positives from uninstrumented OpenSSL internals at runtime.
+            sysroot = _msan_sysroot_path(self.chip_root)
+            self.build_env['PKG_CONFIG_PATH'] = ':'.join([
+                f'{sysroot}/lib/x86_64-linux-gnu/pkgconfig',
+                f'{sysroot}/lib/pkgconfig',
+                f'{sysroot}/lib64/pkgconfig',
+            ])
         if self.app == HostApp.TESTS and self.use_coverage and self.use_clang and self.fuzzing_type == HostFuzzingType.NONE:
             # Every test is expected to have a distinct build ID, so `%m` will be
             # distinct.
