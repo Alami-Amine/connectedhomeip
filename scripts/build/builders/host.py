@@ -535,8 +535,10 @@ class HostBuilder(GnBuilder):
             self.extra_gn_options.append('is_ubsan=true')
 
         if use_msan:
+            # MSAN is gated to clang-only target names via targets.py
+            # (OnlyIfRe("-clang")), so use_clang is already True here and
+            # is_clang=true is added by the clang modifier path.
             self.extra_gn_options.append('is_msan=true')
-            self.extra_gn_options.append('is_clang=true')
             self.extra_gn_options.append('msan_sysroot="%s"' % _msan_sysroot_path(chip_root))
 
         if use_dmalloc:
