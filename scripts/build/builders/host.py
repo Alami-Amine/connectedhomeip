@@ -68,14 +68,13 @@ def _msan_validate_sysroot(chip_root: str) -> None:
         '\n'
         f'MSAN sysroot check failed: {detail}\n'
         '\n'
-        'MSAN needs every dependency (libc++, libc++abi, OpenSSL, etc.)\n'
-        'compiled with -fsanitize=memory; uninstrumented code triggers\n'
-        'false positives.\n'
+        'MSAN needs every dependency (libc++, libc++abi, OpenSSL, etc.) compiled \n'
+        'with -fsanitize=memory; uninstrumented code triggers false positives.\n'
         '\n'
         'Build it with:\n'
         f'    {_MSAN_BUILD_SCRIPT}\n'
         '\n'
-        'First-time build: ~15-30 min, ~2 GB on disk; subsequent invocations are no-ops.\n'
+        'First-time build: 5-15 min, ~4 GB on disk during build\n'
         'Override path with: export SYSROOT_MSAN=<path>',
         file=sys.stderr,
     )

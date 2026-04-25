@@ -22,7 +22,7 @@
 #
 # Idempotent: if the sysroot is already built and its inputs (this script,
 # msan_ignorelist.txt, clang version) have not changed, the script exits
-# in milliseconds. First-time build takes ~15-30 minutes.
+# in milliseconds. First-time build takes ~5-15 minutes.
 #
 # Prerequisites: source scripts/activate.sh
 #
@@ -61,7 +61,7 @@ Environment:
 
 The script is idempotent: if the sysroot is already built and its inputs
 (this script, msan_ignorelist.txt, clang version) have not changed, it
-exits in milliseconds. A first-time build takes 15-30 minutes.
+exits in milliseconds. A first-time build takes 5-15 minutes.
 
 build_examples.py reads the resolved sysroot path via host.py and passes
 it to GN as msan_sysroot="<path>". Raw \`gn gen\` users must export
@@ -159,7 +159,7 @@ trap on_error ERR
 
 LLVM_COMMIT=$("$PW_CLANG/clang" --version | grep -oP '[0-9a-f]{40}')
 
-echo ">>> Building MSAN sysroot at $SYSROOT (this takes 15-30 min)"
+echo ">>> Building MSAN sysroot at $SYSROOT (this takes 5-15 min)"
 
 # libc++ / libc++abi (MSan-instrumented)
 echo ">>> libc++ / libc++abi"
