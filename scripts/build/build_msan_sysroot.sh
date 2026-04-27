@@ -21,13 +21,13 @@
 # library internals.
 #
 # Idempotent: if the sysroot is already built and its inputs (this script,
-# msan_ignorelist.txt, clang version) have not changed, the script exits
-# in milliseconds. First-time build takes ~5-15 minutes.
+# msan_ignorelist.txt, clang version) have not changed, the script exits directly.
+# First-time build takes ~5-15 minutes.
 #
 # Prerequisites: source scripts/activate.sh
 #
 # Usage:
-#   scripts/build/build_msan_sysroot.sh [--out-dir PATH] [--force] [--help]
+#   scripts/build/build_msan_sysroot.sh [--out-dir PATH] [--force] [--check] [--help]
 #
 # Environment:
 #   SYSROOT_MSAN  Override install location (default: ~/.cache/matter/msan_sysroot)

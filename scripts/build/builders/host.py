@@ -28,19 +28,11 @@ _MSAN_DEFAULT_SYSROOT = os.path.expanduser('~/.cache/matter/msan_sysroot')
 _MSAN_BUILD_SCRIPT = 'scripts/build/build_msan_sysroot.sh'
 
 
-def _msan_sysroot_path(chip_root: str) -> str:
+def _msan_sysroot_path() -> str:
     """Resolve the MSAN sysroot path that GN will reference.
-
-    Order: SYSROOT_MSAN env var, then the repo-root msan_sysroot symlink
-    (created by the build script), then the default cache location.
     """
     if 'SYSROOT_MSAN' in os.environ:
         return os.path.abspath(os.environ['SYSROOT_MSAN'])
-
-    repo_sysroot = os.path.join(chip_root, 'msan_sysroot')
-    if os.path.exists(repo_sysroot):
-        return os.path.abspath(repo_sysroot)
-
     return os.path.abspath(_MSAN_DEFAULT_SYSROOT)
 
 
@@ -54,7 +46,7 @@ def _msan_validate_sysroot(chip_root: str) -> None:
     Exits via sys.exit() rather than raising so the user sees a clean
     actionable message instead of a click/builder traceback.
     """
-    sysroot = _msan_sysroot_path(chip_root)
+    sysroot = _msan_sysroot_path()
     script = os.path.join(chip_root, _MSAN_BUILD_SCRIPT)
     result = subprocess.run(
         [script, '--out-dir', sysroot, '--check'],
@@ -483,12 +475,8 @@ class HostBuilder(GnBuilder):
                       into per-target directories. Directory name will be "unified"
         """
 
-        # MSAN requires an instrumented sysroot. Validate before any other
-        # build setup so the user sees the "build the sysroot first" error
-        # immediately, while `root` still points at CHIP_ROOT.
+        # Save before `root` is mutated below (used by MSAN validation later).
         chip_root = os.path.abspath(root)
-        if use_msan and not runner.dry_run:
-            _msan_validate_sysroot(chip_root)
 
         # Unified builds use the top level root for compilation
         if not unified:
@@ -503,7 +491,6 @@ class HostBuilder(GnBuilder):
         self.fuzzing_type = fuzzing_type
         self.unified = unified
         self.use_msan = use_msan
-        self.chip_root = chip_root
 
         if enable_rpcs:
             self.extra_gn_options.append('import("//with_pw_rpc.gni")')
@@ -548,11 +535,11 @@ class HostBuilder(GnBuilder):
             self.extra_gn_options.append('is_ubsan=true')
 
         if use_msan:
-            # MSAN is gated to clang-only target names via targets.py
-            # (OnlyIfRe("-clang")), so use_clang is already True here and
-            # is_clang=true is added by the clang modifier path.
+            if not runner.dry_run:
+                _msan_validate_sysroot(chip_root)
             self.extra_gn_options.append('is_msan=true')
-            self.extra_gn_options.append('msan_sysroot="%s"' % _msan_sysroot_path(chip_root))
+            # Tell GN to build against the same sysroot we just validated.
+            self.extra_gn_options.append('msan_sysroot="%s"' % _msan_sysroot_path())
 
         if use_dmalloc:
             self.extra_gn_options.append('chip_config_memory_debug_checks=true')
@@ -749,11 +736,10 @@ class HostBuilder(GnBuilder):
             self.build_env['PKG_CONFIG_PATH'] = os.path.join(
                 self.SysRootPath('SYSROOT_AARCH64'), 'lib/aarch64-linux-gnu/pkgconfig')
         if self.use_msan:
-            # Steer pkg-config to the instrumented OpenSSL/zlib/glib/etc. in
-            # the MSAN sysroot. Without this, Matter's GN config picks up the
-            # system libcrypto.so.3 at link time, and MSAN reports endless
-            # false positives from uninstrumented OpenSSL internals at runtime.
-            sysroot = _msan_sysroot_path(self.chip_root)
+            # make pkg-config use the instrumented OpenSSL/zlib/glib/etc. in the MSAN sysroot.
+            # Without this, Matter's GN config picks up the system's libs, and MSAN reports endless
+            # false positives from uninstrumented dependencies at runtime.
+            sysroot = _msan_sysroot_path()
             self.build_env['PKG_CONFIG_PATH'] = ':'.join([
                 f'{sysroot}/lib/x86_64-linux-gnu/pkgconfig',
                 f'{sysroot}/lib/pkgconfig',
@@ -763,7 +749,7 @@ class HostBuilder(GnBuilder):
             # Every test is expected to have a distinct build ID, so `%m` will be
             # distinct.
             #
-            # Output is relative to "oputput_dir" since that is where GN executs
+            # Output is relative to "output_dir" since that is where GN executes
             self.build_env['LLVM_PROFILE_FILE'] = os.path.join("coverage", "profiles", "run_%b.profraw")
 
         return self.build_env
