@@ -14,6 +14,7 @@ import("//build_overrides/build.gni")
 import("//build_overrides/chip.gni")
 
 import("${chip_root}/build/chip/chip_test_suite.gni")
+import("${chip_root}/build/chip/fuzz_test.gni")
 
 chip_test_suite("tests") {
   output_name = "libUserDirectedCommissioningTests"
@@ -28,4 +29,24 @@ chip_test_suite("tests") {
   ]
 
   cflags = [ "-Wconversion" ]
+}
+
+if (enable_fuzz_test_targets) {
+  chip_fuzz_target("fuzz-udc-messages") {
+    sources = [ "FuzzUdcMessages.cpp" ]
+    public_deps = [
+      "${chip_root}/src/platform/logging:default",
+      "${chip_root}/src/protocols",
+    ]
+  }
+}
+
+if (pw_enable_fuzz_test_targets) {
+  chip_pw_fuzz_target("fuzz-udc-messages-pw") {
+    test_source = [ "FuzzUdcMessagesPW.cpp" ]
+    public_deps = [
+      "${chip_root}/src/platform/logging:default",
+      "${chip_root}/src/protocols",
+    ]
+  }
 }

@@ -73,3 +73,29 @@ chip_test_suite("tests") {
     "${chip_root}/src/platform",
   ]
 }
+
+import("${chip_root}/build/chip/fuzz_test.gni")
+
+if (enable_fuzz_test_targets) {
+  chip_fuzz_target("fuzz-spake2p-verifier") {
+    sources = [ "FuzzSpake2pVerifier.cpp" ]
+    public_deps = [
+      "${chip_root}/src/crypto",
+      "${chip_root}/src/platform/logging:default",
+    ]
+  }
+  chip_fuzz_target("fuzz-aes-ccm-decrypt") {
+    sources = [ "FuzzAesCcmDecrypt.cpp" ]
+    public_deps = [
+      "${chip_root}/src/crypto",
+      "${chip_root}/src/platform/logging:default",
+    ]
+  }
+  chip_fuzz_target("fuzz-hkdf-sha256") {
+    sources = [ "FuzzHkdfSha256.cpp" ]
+    public_deps = [
+      "${chip_root}/src/crypto",
+      "${chip_root}/src/platform/logging:default",
+    ]
+  }
+}

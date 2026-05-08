@@ -54,6 +54,59 @@ if (enable_fuzz_test_targets) {
       "${chip_root}/src/platform/logging:default",
     ]
   }
+  chip_fuzz_target("fuzz-tlv-utilities") {
+    sources = [ "FuzzTLVUtilities.cpp" ]
+    public_deps = [
+      "${chip_root}/src/lib/core",
+      "${chip_root}/src/platform/logging:default",
+    ]
+  }
+  chip_fuzz_target("fuzz-tlv-circular-buffer") {
+    sources = [ "FuzzTLVCircularBuffer.cpp" ]
+    public_deps = [
+      "${chip_root}/src/lib/core",
+      "${chip_root}/src/lib/core:vectortlv",
+      "${chip_root}/src/platform/logging:default",
+    ]
+  }
+  chip_fuzz_target("fuzz-tlv-deep-nesting") {
+    sources = [ "FuzzTLVDeepNesting.cpp" ]
+    public_deps = [
+      "${chip_root}/src/lib/core",
+      "${chip_root}/src/platform/logging:default",
+    ]
+  }
+  chip_fuzz_target("fuzz-reference-counted") {
+    sources = [ "FuzzReferenceCounted.cpp" ]
+    public_deps = [
+      "${chip_root}/src/lib/core",
+      "${chip_root}/src/platform/logging:default",
+    ]
+  }
+}
+
+if (pw_enable_fuzz_test_targets) {
+  chip_pw_fuzz_target("fuzz-tlv-roundtrip-pw") {
+    test_source = [ "FuzzTLVRoundtripPW.cpp" ]
+    public_deps = [
+      "${chip_root}/src/lib/core",
+      "${chip_root}/src/platform/logging:default",
+    ]
+  }
+  chip_pw_fuzz_target("fuzz-tlv-utilities-pw") {
+    test_source = [ "FuzzTLVUtilitiesPW.cpp" ]
+    public_deps = [
+      "${chip_root}/src/lib/core",
+      "${chip_root}/src/platform/logging:default",
+    ]
+  }
+  chip_pw_fuzz_target("fuzz-tlv-deep-nesting-pw") {
+    test_source = [ "FuzzTLVDeepNestingPW.cpp" ]
+    public_deps = [
+      "${chip_root}/src/lib/core",
+      "${chip_root}/src/platform/logging:default",
+    ]
+  }
 }
 
 if (pw_enable_fuzz_test_targets) {

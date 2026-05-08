@@ -19,6 +19,8 @@ import("${chip_root}/src/inet/inet.gni")
 import("${chip_root}/src/platform/device.gni")
 
 import("${chip_root}/build/chip/chip_test_suite.gni")
+import("${chip_root}/build/chip/fuzz_test.gni")
+
 static_library("helpers") {
   output_name = "libNetworkTestHelpers"
   output_dir = "${root_out_dir}/lib"
@@ -69,4 +71,31 @@ chip_test_suite("tests") {
   ]
 
   cflags = [ "-Wconversion" ]
+}
+
+if (enable_fuzz_test_targets) {
+  chip_fuzz_target("fuzz-message-header") {
+    sources = [ "FuzzMessageHeader.cpp" ]
+    public_deps = [
+      "${chip_root}/src/platform/logging:default",
+      "${chip_root}/src/transport/raw",
+    ]
+  }
+  chip_fuzz_target("fuzz-message-header-roundtrip") {
+    sources = [ "FuzzMessageHeaderRoundtrip.cpp" ]
+    public_deps = [
+      "${chip_root}/src/platform/logging:default",
+      "${chip_root}/src/transport/raw",
+    ]
+  }
+}
+
+if (pw_enable_fuzz_test_targets) {
+  chip_pw_fuzz_target("fuzz-message-header-pw") {
+    test_source = [ "FuzzMessageHeaderPW.cpp" ]
+    public_deps = [
+      "${chip_root}/src/platform/logging:default",
+      "${chip_root}/src/transport/raw",
+    ]
+  }
 }

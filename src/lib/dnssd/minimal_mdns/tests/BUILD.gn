@@ -52,6 +52,20 @@ if (enable_fuzz_test_targets) {
       "${chip_root}/src/platform/logging:default",
     ]
   }
+  chip_fuzz_target("fuzz-minmdns-record-data") {
+    sources = [ "FuzzMdnsRecordData.cpp" ]
+    public_deps = [
+      "${chip_root}/src/lib/dnssd/minimal_mdns",
+      "${chip_root}/src/platform/logging:default",
+    ]
+  }
+  chip_fuzz_target("fuzz-minmdns-qname") {
+    sources = [ "FuzzMdnsQName.cpp" ]
+    public_deps = [
+      "${chip_root}/src/lib/dnssd/minimal_mdns",
+      "${chip_root}/src/platform/logging:default",
+    ]
+  }
 }
 
 if (pw_enable_fuzz_test_targets) {

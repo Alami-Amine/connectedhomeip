@@ -24,6 +24,7 @@ import("${chip_root}/src/system/system.gni")
 
 if (chip_build_tests) {
   import("${chip_root}/build/chip/chip_test_suite.gni")
+  import("${chip_root}/build/chip/fuzz_test.gni")
 }
 
 config("tests_config") {
@@ -95,6 +96,26 @@ if (chip_build_tests) {
     }
 
     cflags = [ "-Wconversion" ]
+  }
+}
+
+if (chip_build_tests && enable_fuzz_test_targets) {
+  chip_fuzz_target("fuzz-ip-address") {
+    sources = [ "FuzzIpAddress.cpp" ]
+    public_deps = [
+      "${chip_root}/src/inet",
+      "${chip_root}/src/platform/logging:default",
+    ]
+  }
+}
+
+if (chip_build_tests && pw_enable_fuzz_test_targets) {
+  chip_pw_fuzz_target("fuzz-ip-address-pw") {
+    test_source = [ "FuzzIpAddressPW.cpp" ]
+    public_deps = [
+      "${chip_root}/src/inet",
+      "${chip_root}/src/platform/logging:default",
+    ]
   }
 }
 

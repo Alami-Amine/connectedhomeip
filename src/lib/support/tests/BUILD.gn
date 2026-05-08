@@ -17,6 +17,7 @@ import("//build_overrides/chip.gni")
 import("//build_overrides/pigweed.gni")
 
 import("${chip_root}/build/chip/chip_test_suite.gni")
+import("${chip_root}/build/chip/fuzz_test.gni")
 
 pw_source_set("pw-test-macros") {
   output_dir = "${root_out_dir}/lib"
@@ -104,4 +105,24 @@ chip_test_suite("tests") {
     "${chip_root}/src/lib/support/jsontlv",
     "${chip_root}/src/platform",
   ]
+}
+
+if (enable_fuzz_test_targets) {
+  chip_fuzz_target("fuzz-base64") {
+    sources = [ "FuzzBase64.cpp" ]
+    public_deps = [
+      "${chip_root}/src/lib/support",
+      "${chip_root}/src/platform/logging:default",
+    ]
+  }
+}
+
+if (pw_enable_fuzz_test_targets) {
+  chip_pw_fuzz_target("fuzz-base64-pw") {
+    test_source = [ "FuzzBase64PW.cpp" ]
+    public_deps = [
+      "${chip_root}/src/lib/support",
+      "${chip_root}/src/platform/logging:default",
+    ]
+  }
 }

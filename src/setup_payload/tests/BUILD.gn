@@ -56,11 +56,46 @@ if (enable_fuzz_test_targets) {
       "${chip_root}/src/setup_payload",
     ]
   }
+  chip_fuzz_target("fuzz-setup-payload-additional-data") {
+    sources = [ "FuzzAdditionalDataPayload.cpp" ]
+    public_deps = [
+      "${chip_root}/src/platform/logging:stdio",
+      "${chip_root}/src/setup_payload",
+    ]
+  }
+  chip_fuzz_target("fuzz-setup-payload-manual") {
+    sources = [ "FuzzManualSetupCode.cpp" ]
+    public_deps = [
+      "${chip_root}/src/platform/logging:stdio",
+      "${chip_root}/src/setup_payload",
+    ]
+  }
+  chip_fuzz_target("fuzz-setup-payload-qrcode") {
+    sources = [ "FuzzQRCodeSetupPayload.cpp" ]
+    public_deps = [
+      "${chip_root}/src/platform/logging:stdio",
+      "${chip_root}/src/setup_payload",
+    ]
+  }
+  chip_fuzz_target("fuzz-setup-payload-manual-roundtrip") {
+    sources = [ "FuzzManualSetupCodeRoundtrip.cpp" ]
+    public_deps = [
+      "${chip_root}/src/platform/logging:stdio",
+      "${chip_root}/src/setup_payload",
+    ]
+  }
 }
 
 if (pw_enable_fuzz_test_targets) {
   chip_pw_fuzz_target("fuzz-setup-payload-base38-pw") {
     test_source = [ "FuzzBase38PW.cpp" ]
+    public_deps = [
+      "${chip_root}/src/platform/logging:stdio",
+      "${chip_root}/src/setup_payload",
+    ]
+  }
+  chip_pw_fuzz_target("fuzz-setup-payload-manual-pw") {
+    test_source = [ "FuzzManualSetupCodePW.cpp" ]
     public_deps = [
       "${chip_root}/src/platform/logging:stdio",
       "${chip_root}/src/setup_payload",
