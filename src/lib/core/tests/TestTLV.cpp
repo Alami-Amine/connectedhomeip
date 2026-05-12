@@ -4946,3 +4946,58 @@ TEST_F(TestTLV, TestUninitializedWriter)
         EXPECT_EQ(writer.CopyContainer(ContextTag(1), buf, static_cast<uint16_t>(sizeof(buf))), CHIP_ERROR_INCORRECT_STATE);
     }
 }
+
+TEST_F(TestTLV, CheckMaxContainerNestingDepthRejected)
+{
+    // Build a TLV encoding with kMaxTLVNestingDepth + 2 levels of anonymous list nesting
+    // (1 outer + kMaxTLVNestingDepth + 1 inner).  When SkipToEndOfContainer is called on the
+    // outer list, it will encounter kMaxTLVNestingDepth + 1 nested containers, exceeding the
+    // limit, and must be rejected with CHIP_ERROR_INVALID_TLV_ELEMENT.
+    //
+    // TLV encoding: (kMaxTLVNestingDepth + 2) x 0x17 (anonymous list start)
+    //             + (kMaxTLVNestingDepth + 2) x 0x18 (end of container)
+    constexpr uint32_t totalDepth = kMaxTLVNestingDepth + 2; // 1 outer + (kMaxTLVNestingDepth + 1) inner
+    uint8_t deeplyNested[totalDepth * 2];
+    for (uint32_t i = 0; i < totalDepth; ++i)
+    {
+        deeplyNested[i]              = 0x17; // anonymous list start
+        deeplyNested[totalDepth + i] = 0x18; // end of container
+    }
+
+    TLVReader reader;
+    reader.Init(deeplyNested, sizeof(deeplyNested));
+
+    EXPECT_EQ(reader.Next(), CHIP_NO_ERROR);
+    EXPECT_EQ(reader.GetType(), kTLVType_List);
+
+    TLVType outerContainerType;
+    EXPECT_EQ(reader.EnterContainer(outerContainerType), CHIP_NO_ERROR);
+    EXPECT_EQ(reader.ExitContainer(outerContainerType), CHIP_ERROR_INVALID_TLV_ELEMENT);
+}
+
+TEST_F(TestTLV, CheckMaxContainerNestingDepthAccepted)
+{
+    // Build a TLV encoding with exactly kMaxTLVNestingDepth inner lists (1 outer
+    // + kMaxTLVNestingDepth inner = kMaxTLVNestingDepth + 1 total levels).
+    // This must be accepted successfully.
+    //
+    // TLV encoding: (kMaxTLVNestingDepth + 1) x 0x17 (anonymous list start)
+    //             + (kMaxTLVNestingDepth + 1) x 0x18 (end of container)
+    constexpr uint32_t totalDepth = kMaxTLVNestingDepth + 1; // 1 outer + kMaxTLVNestingDepth inner
+    uint8_t atLimit[totalDepth * 2];
+    for (uint32_t i = 0; i < totalDepth; ++i)
+    {
+        atLimit[i]              = 0x17; // anonymous list start
+        atLimit[totalDepth + i] = 0x18; // end of container
+    }
+
+    TLVReader reader;
+    reader.Init(atLimit, sizeof(atLimit));
+
+    EXPECT_EQ(reader.Next(), CHIP_NO_ERROR);
+    EXPECT_EQ(reader.GetType(), kTLVType_List);
+
+    TLVType outerContainerType;
+    EXPECT_EQ(reader.EnterContainer(outerContainerType), CHIP_NO_ERROR);
+    EXPECT_EQ(reader.ExitContainer(outerContainerType), CHIP_NO_ERROR);
+}

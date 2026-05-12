@@ -729,6 +729,7 @@ CHIP_ERROR TLVReader::SkipToEndOfContainer()
         else if (TLVTypeIsContainer(elemType))
         {
             nestLevel++;
+            VerifyOrReturnError(nestLevel <= kMaxTLVNestingDepth, CHIP_ERROR_INVALID_TLV_ELEMENT);
             mContainerType = static_cast<TLVType>(elemType);
         }
 

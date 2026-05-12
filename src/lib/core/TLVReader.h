@@ -57,6 +57,12 @@ namespace chip {
 namespace TLV {
 
 /**
+ * Maximum number of nested TLV containers that SkipToEndOfContainer will traverse.
+ * Inputs exceeding this depth are rejected with CHIP_ERROR_INVALID_TLV_ELEMENT.
+ */
+inline constexpr uint32_t kMaxTLVNestingDepth = 8;
+
+/**
  * Provides a memory efficient parser for data encoded in CHIP TLV format.
  *
  * TLVReader implements a forward-only, “pull-style” parser for CHIP TLV data.  The TLVReader
