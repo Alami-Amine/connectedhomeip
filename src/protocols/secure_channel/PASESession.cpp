@@ -578,6 +578,8 @@ CHIP_ERROR PASESession::HandlePBKDFParamResponse(System::PacketBufferHandle && m
 
         SuccessOrExit(err = tlvReader.Next(AsTlvContextTag(PBKDFParameterSetTags::kIterations)));
         SuccessOrExit(err = tlvReader.Get(mIterationCount));
+        VerifyOrExit(mIterationCount >= kSpake2p_Min_PBKDF_Iterations && mIterationCount <= kSpake2p_Max_PBKDF_Iterations,
+                     err = CHIP_ERROR_INVALID_PASE_PARAMETER);
 
         SuccessOrExit(err = tlvReader.Next(AsTlvContextTag(PBKDFParameterSetTags::kSalt)));
         VerifyOrExit(tlvReader.GetLength() >= kSpake2p_Min_PBKDF_Salt_Length &&

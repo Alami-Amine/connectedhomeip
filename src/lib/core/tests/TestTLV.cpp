@@ -4946,3 +4946,44 @@ TEST_F(TestTLV, TestUninitializedWriter)
         EXPECT_EQ(writer.CopyContainer(ContextTag(1), buf, static_cast<uint16_t>(sizeof(buf))), CHIP_ERROR_INCORRECT_STATE);
     }
 }
+
+TEST_F(TestTLV, CheckMaxContainerNestingDepthRejected)
+{
+    // Build a TLV encoding with 10 levels of anonymous list nesting (1 outer + 9 inner).
+    // When SkipToEndOfContainer is called on the outer list, it will encounter 9 nested
+    // containers which exceeds kMaxContainerSkipDepth (8) and must be rejected.
+    //
+    // TLV encoding: 10 x 0x17 (anonymous list start) + 10 x 0x18 (end of container)
+    const uint8_t deeplyNested[] = { 0x17, 0x17, 0x17, 0x17, 0x17, 0x17, 0x17, 0x17, 0x17, 0x17,
+                                     0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18 };
+
+    TLVReader reader;
+    reader.Init(deeplyNested, sizeof(deeplyNested));
+
+    EXPECT_EQ(reader.Next(), CHIP_NO_ERROR);
+    EXPECT_EQ(reader.GetType(), kTLVType_List);
+
+    TLVType outerContainerType;
+    EXPECT_EQ(reader.EnterContainer(outerContainerType), CHIP_NO_ERROR);
+    EXPECT_EQ(reader.ExitContainer(outerContainerType), CHIP_ERROR_INVALID_TLV_ELEMENT);
+}
+
+TEST_F(TestTLV, CheckMaxContainerNestingDepthAccepted)
+{
+    // Build a TLV encoding with exactly kMaxContainerSkipDepth (8) inner lists (1 outer
+    // + 8 inner = 9 levels total).  This must be accepted successfully.
+    //
+    // TLV encoding: 9 x 0x17 (anonymous list start) + 9 x 0x18 (end of container)
+    const uint8_t atLimit[] = { 0x17, 0x17, 0x17, 0x17, 0x17, 0x17, 0x17, 0x17, 0x17,
+                                0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18 };
+
+    TLVReader reader;
+    reader.Init(atLimit, sizeof(atLimit));
+
+    EXPECT_EQ(reader.Next(), CHIP_NO_ERROR);
+    EXPECT_EQ(reader.GetType(), kTLVType_List);
+
+    TLVType outerContainerType;
+    EXPECT_EQ(reader.EnterContainer(outerContainerType), CHIP_NO_ERROR);
+    EXPECT_EQ(reader.ExitContainer(outerContainerType), CHIP_NO_ERROR);
+}

@@ -135,6 +135,7 @@ CHIP_ERROR TransferInit::Parse(System::PacketBufferHandle aBuffer)
 
     ReturnErrorOnFailure(bufReader.Read16(&FileDesLength).StatusCode());
 
+    VerifyOrReturnError(FileDesLength <= kMaxFileDesignatorLen, CHIP_ERROR_INVALID_STRING_LENGTH);
     VerifyOrReturnError(bufReader.HasAtLeast(FileDesLength), CHIP_ERROR_MESSAGE_INCOMPLETE);
     FileDesignator = &bufStart[bufReader.OctetsRead()];
 

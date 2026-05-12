@@ -364,4 +364,66 @@ TEST_F(TestTransferDiagnosticLog, AccpetsTransferAndReceivesNonNullTerminatedDat
     EXPECT_TRUE(fileDesignator.data_equal(CharSpan{ testFileDes, 8 }));
 }
 
+TEST_F(TestTransferDiagnosticLog, RejectsPathTraversalInFileDesignator)
+{
+    struct TestCase
+    {
+        const char * fileDesignator;
+        uint16_t fileDesignatorLen;
+    };
+
+    // Each of these designators should cause BDXTransferProxyDiagnosticLog::Init() to fail.
+    const TestCase traversalCases[] = {
+        { "../secrets", 10 },
+        { "a/../b", 6 },
+        { "logs/../../etc", 14 },
+        { "/etc/passwd", 11 },
+        { "foo\\bar", 7 },
+    };
+
+    for (const auto & tc : traversalCases)
+    {
+        BDXTransferProxyDiagnosticLog proxyDiagnosticLog{};
+
+        TransferSession initiator;
+        TransferSession::TransferInitData transferInitData;
+        transferInitData.TransferCtlFlags = TransferControlFlags::kSenderDrive;
+        transferInitData.MaxBlockSize     = kMaxBlockSize;
+        transferInitData.StartOffset      = 0;
+        transferInitData.Length           = 1024;
+        transferInitData.FileDesLength    = tc.fileDesignatorLen;
+        transferInitData.FileDesignator   = reinterpret_cast<const uint8_t *>(tc.fileDesignator);
+        transferInitData.MetadataLength   = 0;
+        transferInitData.Metadata         = nullptr;
+
+        CHIP_ERROR r = initiator.StartTransfer(TransferRole::kSender, transferInitData, System::Clock::Seconds16(10));
+        EXPECT_EQ(r, CHIP_NO_ERROR);
+
+        TransferSession::OutputEvent initiatorEvent;
+        initiator.PollOutput(initiatorEvent, System::Clock::kZero);
+        EXPECT_EQ(initiatorEvent.EventType, TransferSession::OutputEventType::kMsgToSend);
+
+        r = mTransferSession.WaitForTransfer(TransferRole::kReceiver, TransferControlFlags::kSenderDrive, kMaxBlockSize,
+                                             System::Clock::Seconds16(20));
+        EXPECT_EQ(r, CHIP_NO_ERROR);
+
+        chip::PayloadHeader payloadHeader;
+        payloadHeader.SetMessageType(initiatorEvent.msgTypeData.ProtocolId, initiatorEvent.msgTypeData.MessageType);
+
+        r = mTransferSession.HandleMessageReceived(payloadHeader, std::move(initiatorEvent.MsgData), System::Clock::kZero);
+        EXPECT_EQ(r, CHIP_NO_ERROR);
+
+        TransferSession::OutputEvent responderEvent;
+        mTransferSession.PollOutput(responderEvent, System::Clock::kZero);
+        EXPECT_EQ(responderEvent.EventType, TransferSession::OutputEventType::kInitReceived);
+
+        // Init must fail because the file designator contains a path traversal sequence.
+        r = proxyDiagnosticLog.Init(&mTransferSession);
+        EXPECT_EQ(r, CHIP_ERROR_INVALID_ARGUMENT);
+
+        initiator.Reset();
+        mTransferSession.Reset();
+    }
+}
+
 } // namespace

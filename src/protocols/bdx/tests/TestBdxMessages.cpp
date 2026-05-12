@@ -1,4 +1,5 @@
 #include <limits>
+#include <string.h>
 
 #include <pw_unit_test/framework.h>
 
@@ -137,4 +138,31 @@ TEST_F(TestBdxMessages, TestBlockQueryWithSkipMessage)
     testMsg.BytesToSkip  = 16;
 
     TestHelperWrittenAndParsedMatch<BlockQueryWithSkip>(testMsg);
+}
+
+TEST_F(TestBdxMessages, TestTransferInitRejectsOversizedFileDesignator)
+{
+    // A FileDesLength greater than kMaxFileDesignatorLen (255) must be rejected during Parse().
+    constexpr uint16_t oversizedDesLen = static_cast<uint16_t>(kMaxFileDesignatorLen) + 1u;
+    uint8_t fileDesBytes[oversizedDesLen];
+    memset(fileDesBytes, 'A', oversizedDesLen);
+
+    TransferInit testMsg;
+    testMsg.TransferCtlOptions.ClearAll().Set(TransferControlFlags::kReceiverDrive, true);
+    testMsg.Version      = 1;
+    testMsg.MaxBlockSize = 256;
+    testMsg.FileDesLength  = oversizedDesLen;
+    testMsg.FileDesignator = fileDesBytes;
+
+    size_t msgSize = testMsg.MessageSize();
+    Encoding::LittleEndian::PacketBufferWriter bbuf(System::PacketBufferHandle::New(msgSize));
+    ASSERT_FALSE(bbuf.IsNull());
+    testMsg.WriteToBuffer(bbuf);
+    EXPECT_TRUE(bbuf.Fit());
+
+    System::PacketBufferHandle msgBuf = bbuf.Finalize();
+    ASSERT_FALSE(msgBuf.IsNull());
+
+    TransferInit parsedMsg;
+    EXPECT_EQ(parsedMsg.Parse(std::move(msgBuf)), CHIP_ERROR_INVALID_STRING_LENGTH);
 }

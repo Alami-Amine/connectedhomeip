@@ -35,6 +35,15 @@ CHIP_ERROR BDXTransferProxyDiagnosticLog::Init(TransferSession * transferSession
 
     VerifyOrReturnError(fileDesignatorLength <= MATTER_ARRAY_SIZE(mFileDesignator), CHIP_ERROR_INVALID_STRING_LENGTH);
 
+    // Reject file designators that contain path separator or traversal sequences to prevent
+    // path traversal attacks when the designator is used in file-path construction.
+    VerifyOrReturnError(memchr(fileDesignator, '/', fileDesignatorLength) == nullptr, CHIP_ERROR_INVALID_ARGUMENT);
+    VerifyOrReturnError(memchr(fileDesignator, '\\', fileDesignatorLength) == nullptr, CHIP_ERROR_INVALID_ARGUMENT);
+    for (uint16_t i = 0; i + 1 < fileDesignatorLength; i++)
+    {
+        VerifyOrReturnError(!(fileDesignator[i] == '.' && fileDesignator[i + 1] == '.'), CHIP_ERROR_INVALID_ARGUMENT);
+    }
+
     mTransfer          = transferSession;
     mFileDesignatorLen = static_cast<uint8_t>(fileDesignatorLength);
     memcpy(mFileDesignator, fileDesignator, fileDesignatorLength);
