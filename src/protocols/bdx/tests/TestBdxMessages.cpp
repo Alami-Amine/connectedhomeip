@@ -1,5 +1,5 @@
 #include <limits>
-#include <string.h>
+#include <cstring>
 
 #include <pw_unit_test/framework.h>
 

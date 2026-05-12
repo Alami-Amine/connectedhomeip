@@ -49,11 +49,6 @@ using namespace chip::Encoding;
 
 static const uint8_t sTagSizes[] = { 0, 1, 2, 4, 2, 4, 6, 8 };
 
-// Maximum number of nested containers that SkipToEndOfContainer will descend into.
-// Limits resource use and prevents processing of pathological inputs with extremely
-// deep nesting.
-static constexpr uint32_t kMaxContainerSkipDepth = 8;
-
 TLVReader::TLVReader() :
     ImplicitProfileId(kProfileIdNotSpecified), AppData(nullptr), mElemLenOrVal(0), mBackingStore(nullptr), mReadPoint(nullptr),
     mBufEnd(nullptr), mLenRead(0), mMaxLen(0), mContainerType(kTLVType_NotSpecified), mControlByte(kTLVControlByte_NotSpecified),
@@ -734,7 +729,7 @@ CHIP_ERROR TLVReader::SkipToEndOfContainer()
         else if (TLVTypeIsContainer(elemType))
         {
             nestLevel++;
-            VerifyOrReturnError(nestLevel <= kMaxContainerSkipDepth, CHIP_ERROR_INVALID_TLV_ELEMENT);
+            VerifyOrReturnError(nestLevel <= kMaxTLVNestingDepth, CHIP_ERROR_INVALID_TLV_ELEMENT);
             mContainerType = static_cast<TLVType>(elemType);
         }
 
