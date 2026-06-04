@@ -70,3 +70,18 @@ chip_test_suite("tests") {
     "${chip_root}/src/transport/tests:helpers",
   ]
 }
+
+import("${chip_root}/build/chip/fuzz_test.gni")
+
+if (pw_enable_fuzz_test_targets) {
+  chip_pw_fuzz_target("fuzz-secure-session-pool-pw") {
+    test_source = [ "FuzzSecureSessionPoolPW.cpp" ]
+    public_deps = [
+      "${chip_root}/src/lib/core",
+      "${chip_root}/src/lib/support",
+      "${chip_root}/src/messaging",
+      "${chip_root}/src/platform/logging:default",
+      "${chip_root}/src/transport",
+    ]
+  }
+}

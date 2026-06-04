@@ -72,6 +72,23 @@ if (current_toolchain != "${dir_pw_toolchain}/default:default") {
   if (pw_enable_fuzz_test_targets) {
     group("pw_fuzz_tests") {
       deps = [
+        "${chip_root}/src/app/clusters/access-control-server/tests:fuzz-access-control-decode-pw(//build/toolchain/pw_fuzzer:chip_pw_fuzztest)",
+        "${chip_root}/src/app/clusters/administrator-commissioning-server/tests:fuzz-admin-commissioning-decode-pw(//build/toolchain/pw_fuzzer:chip_pw_fuzztest)",
+        "${chip_root}/src/app/clusters/camera-av-stream-management-server/tests:fuzz-camera-avstream-decode-pw(//build/toolchain/pw_fuzzer:chip_pw_fuzztest)",
+        "${chip_root}/src/app/clusters/general-commissioning-server/tests:fuzz-general-commissioning-decode-pw(//build/toolchain/pw_fuzzer:chip_pw_fuzztest)",
+        "${chip_root}/src/app/clusters/content-launch-server/tests:fuzz-content-launcher-decode-pw(//build/toolchain/pw_fuzzer:chip_pw_fuzztest)",
+        "${chip_root}/src/app/clusters/door-lock-server/tests:fuzz-door-lock-decode-pw(//build/toolchain/pw_fuzzer:chip_pw_fuzztest)",
+        "${chip_root}/src/app/clusters/group-key-mgmt-server/tests:fuzz-group-key-mgmt-decode-pw(//build/toolchain/pw_fuzzer:chip_pw_fuzztest)",
+        "${chip_root}/src/app/clusters/icd-management-server/tests:fuzz-icd-management-decode-pw(//build/toolchain/pw_fuzzer:chip_pw_fuzztest)",
+        "${chip_root}/src/app/clusters/joint-fabric-datastore-server/tests:fuzz-jf-datastore-decode-pw(//build/toolchain/pw_fuzzer:chip_pw_fuzztest)",
+        "${chip_root}/src/app/clusters/network-commissioning/tests:fuzz-network-commissioning-decode-pw(//build/toolchain/pw_fuzzer:chip_pw_fuzztest)",
+        "${chip_root}/src/app/clusters/operational-credentials-server/tests:fuzz-opcreds-decode-pw(//build/toolchain/pw_fuzzer:chip_pw_fuzztest)",
+        "${chip_root}/src/app/clusters/ota-requestor/tests:fuzz-ota-requestor-decode-pw(//build/toolchain/pw_fuzzer:chip_pw_fuzztest)",
+        "${chip_root}/src/app/clusters/scenes-server/tests:fuzz-scenes-management-decode-pw(//build/toolchain/pw_fuzzer:chip_pw_fuzztest)",
+        "${chip_root}/src/app/clusters/thermostat-server/tests:fuzz-thermostat-pw(//build/toolchain/pw_fuzzer:chip_pw_fuzztest)",
+        "${chip_root}/src/app/clusters/time-synchronization-server/tests:fuzz-time-sync-decode-pw(//build/toolchain/pw_fuzzer:chip_pw_fuzztest)",
+        "${chip_root}/src/app/clusters/webrtc-transport-provider-server/tests:fuzz-webrtc-provider-decode-pw(//build/toolchain/pw_fuzzer:chip_pw_fuzztest)",
+        "${chip_root}/src/app/clusters/webrtc-transport-requestor-server/tests:fuzz-webrtc-requestor-decode-pw(//build/toolchain/pw_fuzzer:chip_pw_fuzztest)",
         "${chip_root}/src/credentials/tests:fuzz-chip-cert-pw(//build/toolchain/pw_fuzzer:chip_pw_fuzztest)",
         "${chip_root}/src/lib/core/tests:fuzz-tlv-reader-pw(//build/toolchain/pw_fuzzer:chip_pw_fuzztest)",
         "${chip_root}/src/lib/dnssd/minimal_mdns/tests:fuzz-minmdns-packet-parsing-pw(//build/toolchain/pw_fuzzer:chip_pw_fuzztest)",
@@ -79,6 +96,8 @@ if (current_toolchain != "${dir_pw_toolchain}/default:default") {
         "${chip_root}/src/protocols/secure_channel/tests:fuzz-CASE-pw(//build/toolchain/pw_fuzzer:chip_pw_fuzztest)",
         "${chip_root}/src/protocols/secure_channel/tests:fuzz-PASE-pw(//build/toolchain/pw_fuzzer:chip_pw_fuzztest)",
         "${chip_root}/src/setup_payload/tests:fuzz-setup-payload-base38-pw(//build/toolchain/pw_fuzzer:chip_pw_fuzztest)",
+        "${chip_root}/src/transport/raw/tests:fuzz-message-header-pw(//build/toolchain/pw_fuzzer:chip_pw_fuzztest)",
+        "${chip_root}/src/transport/tests:fuzz-secure-session-pool-pw(//build/toolchain/pw_fuzzer:chip_pw_fuzztest)",
       ]
     }
   }
