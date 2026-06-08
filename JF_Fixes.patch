@@ -1,0 +1,265 @@
+diff --git a/src/app/clusters/joint-fabric-administrator-server/JCMCommissionee.cpp b/src/app/clusters/joint-fabric-administrator-server/JCMCommissionee.cpp
+index e858f9dbbf..8e32232b0d 100644
+--- a/src/app/clusters/joint-fabric-administrator-server/JCMCommissionee.cpp
++++ b/src/app/clusters/joint-fabric-administrator-server/JCMCommissionee.cpp
+@@ -298,6 +298,7 @@ TrustVerificationError JCMCommissionee::PerformVendorIdVerification()
+         {
+             ChipLogError(JointFabric, "Failed to read commissioner info. Error: %" CHIP_ERROR_FORMAT, err.Format());
+             OnVendorIdVerificationComplete(err);
++            return;
+         }
+ 
+         chip::Messaging::ExchangeManager * exchangeMgr = &chip::Server::GetInstance().GetExchangeManager();
+diff --git a/src/app/clusters/joint-fabric-administrator-server/tests/TestJCMCommissionee.cpp b/src/app/clusters/joint-fabric-administrator-server/tests/TestJCMCommissionee.cpp
+index 9fe870eeb0..587b600b0d 100644
+--- a/src/app/clusters/joint-fabric-administrator-server/tests/TestJCMCommissionee.cpp
++++ b/src/app/clusters/joint-fabric-administrator-server/tests/TestJCMCommissionee.cpp
+@@ -374,6 +374,9 @@ protected:
+     void TestReadAdminFabricsPopulatesCommissionerInfo();
+     void TestReadAdminCertsPopulatesCommissionerRcac();
+     void TestReadAdminNOCsPopulatesCommissionerCerts();
++    // Security PoC (Joint Fabric consolidated triage 2026-05-28). JF-6 is demonstrated
++    // by a standalone ASan PoC in the artifacts dir (see note below the JF-7 test).
++    void PoC_JF7_MissingReturnDoubleCompletion();
+ };
+ 
+ TEST_F_FROM_FIXTURE(TestJCMCommissionee, TestNextStageFollowsExpectedOrder)
+@@ -678,6 +681,111 @@ TEST_F_FROM_FIXTURE(TestJCMCommissionee, TestValidateAdministratorIdsMatch)
+     EXPECT_EQ(commissionee.ValidateAdministratorIdsMatch(kAdminFabricId, matchingKey), TrustVerificationError::kInternalError);
+ }
+ 
++// ===========================================================================
++// Security PoCs — Joint Fabric consolidated triage (2026-05-28)
++// ===========================================================================
++//
++// JF-7 (R2-F3 JCM / N4-H2-F1): JCMCommissionee::PerformVendorIdVerification
++// (JCMCommissionee.cpp:296-313) is missing an early `return;` after
++// OnVendorIdVerificationComplete(err) on the FetchCommissionerInfo error path.
++//
++//   FetchCommissionerInfo([this](err){
++//       if (err != CHIP_NO_ERROR) {
++//           ChipLogError(...);
++//           OnVendorIdVerificationComplete(err);   // <- destroys *this in prod
++//           // *** missing return; ***
++//       }
++//       ... VerifyVendorId(exchangeMgr, sessionHandleGetter, &mInfo);  // UAF
++//   });
++//
++// OnVendorIdVerificationComplete -> TrustVerificationStageFinished ->
++// OnTrustVerificationComplete -> mOnCompletion(...). In production mOnCompletion
++// is JointFabricAdministratorGlobalInstance::onComplete (joint-fabric-
++// administrator-server.cpp:252-270) -> CleanupAnnounceJFA() ->
++// mActiveCommissionee.reset() (a std::optional<JCMCommissionee>), destroying the
++// object. Control then falls through to VerifyVendorId(&mInfo), dereferencing
++// freed storage (mInfo holds heap ScopedMemoryBufferWithSize buffers).
++//
++// The PoC heap-owns the commissionee and frees it from mOnCompletion (the exact
++// production teardown). Production uses std::optional inline storage; the
++// use-after-destruction is the same UB, but heap allocation lets ASan flag it
++// deterministically (and mInfo's heap buffers are freed in both cases).
++class MissingReturnJCMCommissionee : public JCMCommissionee
++{
++public:
++    using JCMCommissionee::JCMCommissionee;
++
++    int completionCount = 0;
++
++protected:
++    // Drive StartTrustVerification() straight into kPerformingVendorIDVerification.
++    TrustVerificationStage GetNextTrustVerificationStage(const TrustVerificationStage & currentStage) override
++    {
++        return (currentStage == TrustVerificationStage::kPerformingVendorIDVerification)
++            ? TrustVerificationStage::kComplete
++            : TrustVerificationStage::kPerformingVendorIDVerification;
++    }
++
++    // Count every completion so we can observe the double-completion the missing
++    // return produces. (In production each completion synchronously destroys *this,
++    // turning the 2nd completion + fall-through into a use-after-free.)
++    void OnVendorIdVerificationComplete(const CHIP_ERROR & err) override
++    {
++        ++completionCount;
++        JCMCommissionee::OnVendorIdVerificationComplete(err);
++    }
++
++    // Model "read dispatched OK, response is an error": deliver the failure via
++    // onError and return CHIP_NO_ERROR (as the real Controller::ReadAttribute does on
++    // successful dispatch). Returning an error here would instead make
++    // FetchCommissionerInfo invoke onComplete a second time on its own
++    // (JCMCommissionee.cpp:288-291) and mask the JF-7 fall-through we want to isolate.
++    CHIP_ERROR ReadAdminFabricsAttribute(
++        std::function<void(const ConcreteAttributePath &, const FabricsAttr::DecodableType &)> onSuccess,
++        ReadErrorHandler onError) override
++    {
++        onError(nullptr, CHIP_ERROR_INTERNAL);
++        return CHIP_NO_ERROR;
++    }
++};
++
++// Deterministic regression for JF-7. The missing `return;` after
++// OnVendorIdVerificationComplete(err) lets control fall through to VerifyVendorId,
++// which (because we release the session) hits its own "session is missing" guard
++// and completes a SECOND time. completionCount therefore == 2 with the bug and
++// == 1 with the one-line fix. (The ASan use-after-free this becomes in production
++// — where the first completion destroys *this — is captured separately in
++// jf7_RED_clean.log; this test isolates the logic defect without teardown
++// artifacts so it can serve as a clean red-before/green-after regression.)
++TEST_F_FROM_FIXTURE(TestJCMCommissionee, PoC_JF7_MissingReturnDoubleCompletion)
++{
++    FakeCommandHandler commandHandler;
++    CommandHandler::Handle handle(&commandHandler);
++    Messaging::ExchangeContext * exchangeCtx = NewExchangeToBob(nullptr, false);
++    commandHandler.SetExchangeContext(exchangeCtx);
++
++    MissingReturnJCMCommissionee commissionee(handle, EndpointId{ 41 }, [](CHIP_ERROR) {});
++
++    // Empty the session so the fall-through's VerifyVendorId completes synchronously
++    // via its "session is missing" path (VendorIdVerificationClient.cpp:167-174).
++    commissionee.mSessionHolder.Release();
++
++    commissionee.VerifyTrustAgainstCommissionerAdmin();
++
++    // RED (missing return): read-failure completion + fall-through completion == 2.
++    // GREEN (one-line `return;` fix): exactly one completion.
++    EXPECT_EQ(commissionee.completionCount, 1);
++}
++
++// NOTE: JF-6 (N2-H4-F2) — JCMCommissionee heap-use-after-free on FailSafe expiry
++// during an in-flight Controller::ReadAttribute — is demonstrated by the standalone
++// ASan PoC at
++//   ~/repos/security-artifacts/matter-joint-fabric-consolidated-triage-2026-05-28/
++//       PoC_JF6_jcm_failsafe_uaf.standalone.cpp  (RED log: jcm_RED_both.log)
++// It is not committed here because its green-after requires an architectural fix
++// (cancel the in-flight ReadClient in ~JCMCommissionee, or a weak_ptr liveness
++// guard on the read callbacks) that is out of scope for this triage.
++
+ } // namespace JointFabricAdministrator
+ } // namespace Clusters
+ } // namespace app
+diff --git a/src/app/server/JointFabricDatastore.cpp b/src/app/server/JointFabricDatastore.cpp
+index d67db6aa7e..437e30b0fd 100644
+--- a/src/app/server/JointFabricDatastore.cpp
++++ b/src/app/server/JointFabricDatastore.cpp
+@@ -1720,7 +1720,19 @@ JointFabricDatastore::RemoveBindingFromEndpointForNode(uint16_t listId, NodeId n
+         if (it->nodeID == nodeId && it->listID == listId && it->endpointID == endpointId)
+         {
+             it->statusEntry.state = Clusters::JointFabricDatastore::DatastoreStateEnum::kDeletePending;
+-            return mDelegate->SyncNode(nodeId, *it, [this, it]() { mEndpointBindingEntries.erase(it); });
++            // SECURITY FIX (JF-5): SyncNode is async; capturing the raw iterator `it` is a
++            // use-after-free if an interleaved Add*/Remove* reallocates mEndpointBindingEntries
++            // before the completion fires. Re-resolve by stable key instead (the pattern PR
++            // #71453 applied at AddACLToNode). See TestJointFabricDatastore PoC_JF5_*.
++            return mDelegate->SyncNode(nodeId, *it, [this, listId, nodeId, endpointId]() {
++                mEndpointBindingEntries.erase(
++                    std::remove_if(mEndpointBindingEntries.begin(), mEndpointBindingEntries.end(),
++                                   [&](const auto & entry) {
++                                       return entry.nodeID == nodeId && entry.listID == listId &&
++                                           entry.endpointID == endpointId;
++                                   }),
++                    mEndpointBindingEntries.end());
++            });
+         }
+     }
+ 
+diff --git a/src/app/server/tests/TestJointFabricDatastore.cpp b/src/app/server/tests/TestJointFabricDatastore.cpp
+index c4b11ebf8a..c158a91802 100644
+--- a/src/app/server/tests/TestJointFabricDatastore.cpp
++++ b/src/app/server/tests/TestJointFabricDatastore.cpp
+@@ -508,4 +508,97 @@ TEST(JointFabricDatastoreTest, AddAclDeduplicatesAndRemoveAclSyncsDeletePayload)
+     EXPECT_TRUE(store.GetNodeACLList().empty());
+ }
+ 
++// ===========================================================================
++// Security PoC — JF-5 (R2-F5/F6 + D2-H1 + 26-02), Joint Fabric triage 2026-05-28
++// ===========================================================================
++//
++// JointFabricDatastore::RemoveBindingFromEndpointForNode (JointFabricDatastore.cpp:1723)
++// captures a raw iterator into the async SyncNode completion:
++//
++//   return mDelegate->SyncNode(nodeId, *it, [this, it]() { mEndpointBindingEntries.erase(it); });
++//
++// SyncNode performs an async CASE round-trip; onSuccess fires later. If a second
++// Invoke (e.g. AddBindingToEndpointForNode) grows mEndpointBindingEntries and the
++// std::vector reallocates in the meantime, `it` dangles and erase(it) is a
++// heap-use-after-free. (PR #71453 fixed the AddACLToNode site at :1914 with a
++// stable-key re-resolution but left this and ~11 sibling sites — see 26-02.)
++//
++// The delegate below defers the erase callback (modelling the in-flight round-trip);
++// the test then forces a reallocation and replays the callback.
++class DeferringBindingDelegate : public TrackingDelegate
++{
++public:
++    bool deferNext = false;
++    bool hasDeferred = false;
++    std::function<void()> deferred;
++
++    CHIP_ERROR SyncNode(NodeId nodeId, const BindingEntryType & bindingEntry, std::function<void()> onSuccess) override
++    {
++        if (deferNext)
++        {
++            deferNext   = false;
++            hasDeferred = true;
++            deferred    = std::move(onSuccess);
++            return CHIP_NO_ERROR;
++        }
++        if (onSuccess)
++        {
++            onSuccess();
++        }
++        return CHIP_NO_ERROR;
++    }
++
++    void RunDeferred()
++    {
++        if (hasDeferred && deferred)
++        {
++            deferred();
++        }
++    }
++};
++
++TEST(JointFabricDatastoreTest, PoC_JF5_RemoveBindingIteratorUseAfterFree)
++{
++    JointFabricDatastore store;
++    DeferringBindingDelegate delegate;
++
++    ASSERT_EQ(store.SetDelegate(&delegate), CHIP_NO_ERROR);
++    ASSERT_EQ(store.AddPendingNode(123, "controller-a"_span), CHIP_NO_ERROR);
++    ASSERT_EQ(store.TestAddEndpointEntry(1, 123, "endpoint-a"_span), CHIP_NO_ERROR);
++
++    // Binding that will be removed (entry 0).
++    JointFabricCluster::Structs::DatastoreBindingTargetStruct::Type b0;
++    b0.node.SetValue(0x1000);
++    b0.endpoint.SetValue(2);
++    ASSERT_EQ(store.AddBindingToEndpointForNode(123, 1, b0), CHIP_NO_ERROR);
++    ASSERT_EQ(store.GetEndpointBindingList().size(), 1u);
++    const uint16_t listId0 = store.GetEndpointBindingList()[0].listID;
++
++    // Remove it, but defer the erase callback (models the async SyncNode round-trip).
++    // The [this, it] erase lambda is now stashed; entry 0 is still present (kDeletePending).
++    delegate.deferNext = true;
++    ASSERT_EQ(store.RemoveBindingFromEndpointForNode(listId0, 123, 1), CHIP_NO_ERROR);
++    ASSERT_TRUE(delegate.hasDeferred);
++
++    // A second admin Invoke arrives during the round-trip: add more bindings, forcing
++    // mEndpointBindingEntries to reallocate. The captured iterator `it` now dangles.
++    for (uint16_t i = 1; i <= 12; ++i)
++    {
++        JointFabricCluster::Structs::DatastoreBindingTargetStruct::Type bi;
++        bi.node.SetValue(static_cast<NodeId>(0x2000 + i));
++        bi.endpoint.SetValue(2);
++        ASSERT_EQ(store.AddBindingToEndpointForNode(123, 1, bi), CHIP_NO_ERROR);
++    }
++
++    // The SyncNode response finally arrives: erase(it) on the dangling iterator.
++    // RED  -> ASan heap-use-after-free at JointFabricDatastore.cpp:1723.
++    // GREEN (stable-key re-resolution fix) -> entry listId0 erased correctly, no UAF.
++    delegate.RunDeferred();
++
++    for (const auto & e : store.GetEndpointBindingList())
++    {
++        EXPECT_NE(e.listID, listId0);
++    }
++}
++
+ } // namespace

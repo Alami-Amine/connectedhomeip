@@ -1,0 +1,93 @@
+diff --git a/src/wifipaf/WiFiPAFEndPoint.cpp b/src/wifipaf/WiFiPAFEndPoint.cpp
+index ab6245fa23..0598bb4cfa 100644
+--- a/src/wifipaf/WiFiPAFEndPoint.cpp
++++ b/src/wifipaf/WiFiPAFEndPoint.cpp
+@@ -1008,10 +1008,17 @@ CHIP_ERROR WiFiPAFEndPoint::RxPacketProcess(PacketBufferHandle && data)
+                 err = HandleCapabilitiesRequestReceived(std::move(data));
+                 if (err != CHIP_NO_ERROR)
+                 {
+-                    // If an error occurred decoding and handling the capabilities request, release the BLE connection.
+-                    // Central's connect attempt will time out if peripheral's application decides to keep the BLE
+-                    // connection open, or fail immediately if the application closes the connection.
+-                    closeFlags = closeFlags | kWiFiPAFCloseFlag_SuppressCallback;
++                    // A peer-sent malformed capabilities-request must NOT tear down the
++                    // NAN publish (which is per-app, one-to-many). Reset the endpoint
++                    // state and discard the bad frame so the publish stays alive for
++                    // retries from this peer or any other commissioner. Without this,
++                    // any unauthenticated peer can cancel the publish with one frame.
++                    ChipLogError(WiFiPAF,
++                                 "cap-request decode failed (%" CHIP_ERROR_FORMAT "); discarding frame, keeping publish alive",
++                                 err.Format());
++                    mConnStateFlags.Clear(ConnectionStateFlag::kCapabilitiesMsgReceived);
++                    mState = kState_Ready;
++                    err    = CHIP_NO_ERROR;
+                     ExitNow();
+                 }
+             }
+diff --git a/src/wifipaf/tests/TestWiFiPAFLayer.cpp b/src/wifipaf/tests/TestWiFiPAFLayer.cpp
+index ae33de7fd8..0777028ab9 100644
+--- a/src/wifipaf/tests/TestWiFiPAFLayer.cpp
++++ b/src/wifipaf/tests/TestWiFiPAFLayer.cpp
+@@ -85,6 +85,7 @@ public:
+     bool mResourceAvailable = true;
+     bool isSendQueueNull() { return mEndPoint->mSendQueue.IsNull(); }
+     uint8_t GetResourceWaitCount() { return mEndPoint->mResourceWaitCount; }
++    bool EpIsRegistered() { return mEndPoint->mWiFiPafLayer != nullptr; }
+ 
+ private:
+     WiFiPAFEndPoint * mEndPoint;
+@@ -411,5 +412,54 @@ TEST_F(TestWiFiPAFLayer, CheckRunAsCommissionee)
+     EXPECT_EQ(RmPafSession(PafInfoAccess::kAccSessionId, sessionInfo), CHIP_NO_ERROR);
+     EpDoClose(kWiFiPAFCloseFlag_AbortTransmission, WIFIPAF_ERROR_APP_CLOSED_CONNECTION);
+ }
++
++// Regression test for the WiFi-PAF publish-cancel DoS: a single malformed
++// capabilities-request from any unauthenticated peer must NOT tear down the
++// publisher's endpoint. Tearing it down cancels the one-to-many NAN publish and
++// stops the commissionee being discoverable for the rest of its commissioning
++// window. Before the fix this returns false / leaves the endpoint closed; after
++// the fix the bad frame is discarded and the endpoint stays Ready for retries.
++TEST_F(TestWiFiPAFLayer, MalformedCapabilitiesRequestKeepsPublishAlive)
++{
++    WiFiPAFSession sessionInfo = {
++        .role          = kWiFiPafRole_Publisher,
++        .id            = 1,
++        .peer_id       = 1,
++        .peer_addr     = { 0xd0, 0x17, 0x69, 0xee, 0x7f, 0x3c },
++        .nodeId        = 1,
++        .discriminator = 0xF00,
++    };
++
++    WiFiPAFEndPoint * newEndPoint = nullptr;
++    ASSERT_EQ(NewEndPoint(&newEndPoint, sessionInfo, sessionInfo.role), CHIP_NO_ERROR);
++    ASSERT_NE(newEndPoint, nullptr);
++    SetEndPoint(newEndPoint);
++    EXPECT_EQ(AddPafSession(PafInfoAccess::kAccSessionId, sessionInfo), CHIP_NO_ERROR);
++    newEndPoint->mState = WiFiPAFEndPoint::kState_Ready;
++
++    // The 5-byte DoS frame from the PoC. Too short to be a valid cap-request, so
++    // PAFTransportCapabilitiesRequestMessage::Decode() fails with MESSAGE_INCOMPLETE.
++    constexpr uint8_t kMalformedCapReq[] = { 0x01, 0x00, 0x01, 0x00, 0x00 };
++    auto badFrame = System::PacketBufferHandle::NewWithData(kMalformedCapReq, sizeof(kMalformedCapReq));
++    ASSERT_FALSE(badFrame.IsNull());
++
++    // Frame is discarded, endpoint survives (returns true). Pre-fix: false.
++    EXPECT_EQ(OnWiFiPAFMessageReceived(sessionInfo, std::move(badFrame)), true);
++    // Endpoint must NOT have been freed/closed. Pre-fix DoClose()->Free() nulls this.
++    // (Don't assert on mState alone: Free()/ClearAll also zeroes it to kState_Ready.)
++    EXPECT_TRUE(EpIsRegistered());
++    EXPECT_EQ(newEndPoint->mState, WiFiPAFEndPoint::kState_Ready);
++
++    // The publish is still alive: a subsequent valid cap-request (same or any peer)
++    // completes the handshake on the same endpoint.
++    constexpr uint8_t bufCapReq[] = { 0x65, 0x6c, 0x04, 0x00, 0x00, 0x00, 0x5e, 0x01, 0x06 };
++    auto goodFrame = System::PacketBufferHandle::NewWithData(bufCapReq, sizeof(bufCapReq));
++    ASSERT_FALSE(goodFrame.IsNull());
++    EXPECT_EQ(OnWiFiPAFMessageReceived(sessionInfo, std::move(goodFrame)), true);
++    EXPECT_EQ(newEndPoint->mState, WiFiPAFEndPoint::kState_Connected);
++
++    EXPECT_EQ(RmPafSession(PafInfoAccess::kAccSessionId, sessionInfo), CHIP_NO_ERROR);
++    EpDoClose(kWiFiPAFCloseFlag_AbortTransmission, WIFIPAF_ERROR_APP_CLOSED_CONNECTION);
++}
+ }; // namespace WiFiPAF
+ }; // namespace chip

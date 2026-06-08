@@ -1,0 +1,86 @@
+diff --git a/clang/lib/Analysis/FlowSensitive/Models/UncheckedOptionalAccessModel.cpp b/clang/lib/Analysis/FlowSensitive/Models/UncheckedOptionalAccessModel.cpp
+index 568564fb3..f25f12f3e 100644
+--- a/clang/lib/Analysis/FlowSensitive/Models/UncheckedOptionalAccessModel.cpp
++++ b/clang/lib/Analysis/FlowSensitive/Models/UncheckedOptionalAccessModel.cpp
+@@ -71,10 +71,11 @@ static bool hasOptionalClassName(const CXXRecordDecl &RD) {
+   }
+ 
+   if (RD.getName() == "Optional") {
+-    // Check whether namespace is "::base" or "::folly".
++    // Check whether namespace is "::base", "::folly", or "::chip".
+     const auto *N = dyn_cast_or_null<NamespaceDecl>(RD.getDeclContext());
+     return N != nullptr && (isFullyQualifiedNamespaceEqualTo(*N, "base") ||
+-                            isFullyQualifiedNamespaceEqualTo(*N, "folly"));
++                            isFullyQualifiedNamespaceEqualTo(*N, "folly") ||
++                            isFullyQualifiedNamespaceEqualTo(*N, "chip"));
+   }
+ 
+   if (RD.getName() == "Optional_Base") {
+@@ -89,6 +90,14 @@ static bool hasOptionalClassName(const CXXRecordDecl &RD) {
+            isFullyQualifiedNamespaceEqualTo(*N, "bdlb", "BloombergLP");
+   }
+ 
++  if (RD.getName() == "Nullable") {
++    // chip::app::DataModel::Nullable (derives from std::optional; null == nullopt,
++    // checked via IsNull()/SetNull()/SetNonNull()).
++    const auto *N = dyn_cast_or_null<NamespaceDecl>(RD.getDeclContext());
++    return N != nullptr &&
++           isFullyQualifiedNamespaceEqualTo(*N, "DataModel", "app", "chip");
++  }
++
+   return false;
+ }
+ 
+@@ -978,7 +987,7 @@ ignorableOptional(const UncheckedOptionalAccessModelOptions &Options) {
+ 
+ StatementMatcher
+ valueCall(const std::optional<StatementMatcher> &IgnorableOptional) {
+-  return isOptionalMemberCallWithNameMatcher(hasName("value"),
++  return isOptionalMemberCallWithNameMatcher(hasAnyName("value", "Value"),
+                                              IgnorableOptional);
+ }
+ 
+@@ -1052,7 +1061,7 @@ auto buildTransferMatchSwitch() {
+       // will also pass for other types
+       .CaseOfCFGStmt<CXXMemberCallExpr>(
+           isOptionalMemberCallWithNameMatcher(
+-              hasAnyName("has_value", "hasValue")),
++              hasAnyName("has_value", "hasValue", "HasValue")),
+           transferOptionalHasValueCall)
+ 
+       // optional::operator bool
+@@ -1063,7 +1072,7 @@ auto buildTransferMatchSwitch() {
+       // NullableValue::isNull
+       // Only NullableValue has isNull
+       .CaseOfCFGStmt<CXXMemberCallExpr>(
+-          isOptionalMemberCallWithNameMatcher(hasName("isNull")),
++          isOptionalMemberCallWithNameMatcher(hasAnyName("isNull", "IsNull")),
+           transferOptionalIsNullCall)
+ 
+       // NullableValue::makeValue, NullableValue::makeValueInplace
+@@ -1080,9 +1089,10 @@ auto buildTransferMatchSwitch() {
+             }
+           })
+ 
+-      // optional::emplace
++      // optional::emplace (chip::Optional: Emplace / SetValue)
+       .CaseOfCFGStmt<CXXMemberCallExpr>(
+-          isOptionalMemberCallWithNameMatcher(hasName("emplace")),
++          isOptionalMemberCallWithNameMatcher(
++              hasAnyName("emplace", "Emplace", "SetValue", "SetNonNull")),
+           [](const CXXMemberCallExpr *E, const MatchFinder::MatchResult &,
+              LatticeTransferState &State) {
+             if (RecordStorageLocation *Loc =
+@@ -1091,9 +1101,10 @@ auto buildTransferMatchSwitch() {
+             }
+           })
+ 
+-      // optional::reset
++      // optional::reset (chip::Optional: ClearValue)
+       .CaseOfCFGStmt<CXXMemberCallExpr>(
+-          isOptionalMemberCallWithNameMatcher(hasName("reset")),
++          isOptionalMemberCallWithNameMatcher(
++              hasAnyName("reset", "ClearValue", "SetNull")),
+           [](const CXXMemberCallExpr *E, const MatchFinder::MatchResult &,
+              LatticeTransferState &State) {
+             if (RecordStorageLocation *Loc =
