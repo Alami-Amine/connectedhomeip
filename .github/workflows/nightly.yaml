@@ -495,13 +495,25 @@ jobs:
             # cache miss (first run / image bump / patch change). Bump the '194'
             # in the key together with the chip-build image tag above.
             - name: Restore patched clang-tidy
-              uses: actions/cache@v4 # TODO: pin to a commit SHA per repo policy
+              id: tidy-cache
+              uses: actions/cache/restore@v4 # TODO: pin to a commit SHA per repo policy
               with:
                   path: .cache/chip-optional-clang-tidy/clang-tidy
                   key: chip-optional-clang-tidy-chip-build-194-${{ hashFiles('scripts/tools/clang-tidy/chip-optional-model.patch') }}
 
             - name: Build patched clang-tidy (no-op on cache hit)
               run: ./scripts/run_in_build_env.sh "./scripts/tools/clang-tidy/build-clang-tidy.sh"
+
+            # Save the binary the moment it is built, so a failure in a later step
+            # does not waste the ~hour LLVM build on the next run. (The combined
+            # cache action only saves in a post-job step, which is skipped when the
+            # job fails — which is why the first run did not cache the binary.)
+            - name: Save patched clang-tidy
+              if: steps.tidy-cache.outputs.cache-hit != 'true'
+              uses: actions/cache/save@v4 # TODO: pin to a commit SHA per repo policy
+              with:
+                  path: .cache/chip-optional-clang-tidy/clang-tidy
+                  key: chip-optional-clang-tidy-chip-build-194-${{ hashFiles('scripts/tools/clang-tidy/chip-optional-model.patch') }}
 
             # Plain host config (NO sanitizers — clang-tidy ignores -fsanitize) +
             # a FULL ninja so every zap-generated header exists and every TU
