@@ -506,12 +506,17 @@ jobs:
             # Plain host config (NO sanitizers — clang-tidy ignores -fsanitize) +
             # a FULL ninja so every zap-generated header exists and every TU
             # parses; a codegen-only build would silently skip TUs (coverage gaps).
+            # `ninja -k 0 ... || true`: a full build of a test-enabled config also
+            # *runs* the pigweed python tests (pw_pystamp), which can fail on
+            # env-specific assertions (e.g. scripts/build/test.py golden-file
+            # mismatch under ccache). We only need the C++ generated headers, so we
+            # keep building past such failures and tolerate the non-zero exit.
             - name: Generate compile DB (full host build)
               run: >-
                   ./scripts/run_in_build_env.sh "
                   BUILD_TYPE=host scripts/build/gn_gen.sh --args='is_clang=true' --add-export-compile-commands=* &&
                   BUILD_TYPE=host scripts/tests/gn_tests.sh &&
-                  ninja -C out/host"
+                  (ninja -k 0 -C out/host || true)"
 
             # Whole-tree scan with the patched binary (prepended to PATH inside the
             # build env so the wrapper's `clang-tidy` resolves to it). Advisory:
