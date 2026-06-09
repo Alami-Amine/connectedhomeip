@@ -439,3 +439,95 @@ jobs:
               uses: ./.github/actions/notify-slack-failure
               with:
                 slack-webhook: ${{ secrets.SWTT_SLACK_WEBHOOK }}
+
+    # Whole-tree clang-tidy (repo .clang-tidy check set) using a clang-tidy
+    # patched to understand chip::Optional / DataModel::Nullable, published to
+    # GitHub Code Scanning. ADVISORY: never blocks. See scripts/tools/clang-tidy/
+    # for the patch + helper scripts.
+    chip_optional_clang_tidy:
+        name: Nightly clang-tidy whole-tree (chip::Optional/Nullable) → Code Scanning
+        if: github.actor != 'restyled-io[bot]'
+        permissions:
+            contents: read
+            security-events: write
+        env:
+            DISABLE_CCACHE: ${{ (github.event_name == 'workflow_dispatch' && inputs.disable_ccache == 'true') && 'true' || (contains(github.event.head_commit.message, '[no-ccache]') && 'true') || 'false' }}
+            CCACHE_KEY_SUFFIX: ${{ github.event_name == 'workflow_dispatch' && inputs.cache_suffix || '' }}
+
+        # 16x32: the patched clang-tidy is built from LLVM source on a cache miss.
+        runs-on: namespace-profile-16x32
+
+        container:
+            image: ghcr.io/project-chip/chip-build:194
+            volumes:
+                - /var/run/nsc/:/var/run/nsc/
+            env:
+                NSC_TOKEN_FILE: ${{ env.NSC_TOKEN_FILE }}
+                NAMESPACE_ACTIONS_RESULTS_URL: ${{ env.NAMESPACE_ACTIONS_RESULTS_URL }}
+                NAMESPACE_ACTIONS_RESULTS_SERVICE: ${{ env.NAMESPACE_ACTIONS_RESULTS_SERVICE }}
+                NAMESPACE_ACTIONS_DIRECT_ZIP_UPLOAD: ${{ env.NAMESPACE_ACTIONS_DIRECT_ZIP_UPLOAD }}
+            options: --privileged
+
+        steps:
+            - name: Set up additional environment
+              run: echo "CCACHE_DIR=${GITHUB_WORKSPACE}/.ccache" >> $GITHUB_ENV
+            - name: Checkout
+              uses: actions/checkout@v6.0.2
+            - name: Checkout submodules & Bootstrap
+              uses: ./.github/actions/checkout-submodules-and-bootstrap
+              with:
+                  platform: linux
+                  bootstrap-log-name: bootstrap-logs-clang-tidy-chip-optional
+            - name: Setup and Restore ccache
+              uses: ./.github/actions/setup-ccache
+              with:
+                  disable: ${{ env.DISABLE_CCACHE }}
+                  cache-suffix: ${{ env.CCACHE_KEY_SUFFIX }}
+
+            # Cache the patched clang-tidy so the slow LLVM build only runs on a
+            # cache miss (first run / image bump / patch change). Bump the '194'
+            # in the key together with the chip-build image tag above.
+            - name: Restore patched clang-tidy
+              uses: actions/cache@v4 # TODO: pin to a commit SHA per repo policy
+              with:
+                  path: .cache/chip-optional-clang-tidy/clang-tidy
+                  key: chip-optional-clang-tidy-chip-build-194-${{ hashFiles('scripts/tools/clang-tidy/chip-optional-model.patch') }}
+
+            - name: Build patched clang-tidy (no-op on cache hit)
+              run: ./scripts/run_in_build_env.sh "./scripts/tools/clang-tidy/build-clang-tidy.sh"
+
+            # Plain host config (NO sanitizers — clang-tidy ignores -fsanitize) +
+            # a FULL ninja so every zap-generated header exists and every TU
+            # parses; a codegen-only build would silently skip TUs (coverage gaps).
+            - name: Generate compile DB (full host build)
+              run: >-
+                  ./scripts/run_in_build_env.sh "
+                  BUILD_TYPE=host scripts/build/gn_gen.sh --args='is_clang=true' --add-export-compile-commands=* &&
+                  BUILD_TYPE=host scripts/tests/gn_tests.sh &&
+                  ninja -C out/host"
+
+            # Whole-tree scan with the patched binary (prepended to PATH inside the
+            # build env so the wrapper's `clang-tidy` resolves to it). Advisory:
+            # `|| true` — findings never fail the job. WarningsAsErrors in the repo
+            # .clang-tidy makes the wrapper exit non-zero, but diagnostics are
+            # still logged, which is all the SARIF converter needs.
+            - name: Run clang-tidy (whole tree, advisory)
+              env:
+                  TIDY_BIN_DIR: ${{ github.workspace }}/.cache/chip-optional-clang-tidy
+              run: |
+                  ./scripts/run_in_build_env.sh 'export PATH="'"$TIDY_BIN_DIR"':$PATH"; echo "using clang-tidy: $(command -v clang-tidy)"; ./scripts/run-clang-tidy-on-compile-commands.py --compile-database out/host/compile_commands.json --file-include-regex "(src|examples)/" --file-exclude-regex "/(repo|zzz_generated|lwip)/|-ReadImpl|-InvokeSubscribeImpl|CodegenDataModel_Write|QuieterReporting|/tests/" check' 2>&1 | tee clang-tidy.log || true
+
+            - name: Convert clang-tidy log to SARIF
+              run: python3 scripts/tools/clang-tidy/clang_tidy_to_sarif.py clang-tidy.log --repo-root . > clang-tidy.sarif
+
+            - name: Upload SARIF to Code Scanning
+              uses: github/codeql-action/upload-sarif@8aad20d150bbac5944a9f9d289da16a4b0d87c1e
+              with:
+                  sarif_file: clang-tidy.sarif
+                  category: clang-tidy
+
+            - name: Notify Slack on Failure
+              if: failure()
+              uses: ./.github/actions/notify-slack-failure
+              with:
+                slack-webhook: ${{ secrets.SWTT_SLACK_WEBHOOK }}
