@@ -37,6 +37,11 @@ on:
                 required: false
                 default: ''
                 type: string
+            runner:
+                description: 'Runner label for the chip-optional clang-tidy job (override for forks without Namespace runners)'
+                required: false
+                default: 'namespace-profile-16x32'
+                type: string
 
 concurrency:
     group: ${{ github.ref }}-${{ github.workflow }}-${{ (github.event_name == 'pull_request' && github.event.number) || (github.event_name == 'workflow_dispatch' && github.run_number) || github.sha }}
@@ -454,8 +459,10 @@ jobs:
             DISABLE_CCACHE: ${{ (github.event_name == 'workflow_dispatch' && inputs.disable_ccache == 'true') && 'true' || (contains(github.event.head_commit.message, '[no-ccache]') && 'true') || 'false' }}
             CCACHE_KEY_SUFFIX: ${{ github.event_name == 'workflow_dispatch' && inputs.cache_suffix || '' }}
 
-        # 16x32: the patched clang-tidy is built from LLVM source on a cache miss.
-        runs-on: namespace-profile-16x32
+        # 16x32 Namespace runner (the patched clang-tidy is built from LLVM source on
+        # a cache miss). Overridable via the workflow_dispatch `runner` input for forks
+        # that lack Namespace runners; falls back to the default on the scheduled run.
+        runs-on: ${{ inputs.runner || 'namespace-profile-16x32' }}
 
         container:
             image: ghcr.io/project-chip/chip-build:194
