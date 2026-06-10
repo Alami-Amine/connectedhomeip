@@ -524,10 +524,17 @@ jobs:
             # scripts/build/test.py golden-file mismatch under ccache) and abort this
             # step. We only need the headers, not test results; `-k 0 || true` also
             # tolerates any stray test-stamp targets that execute during the build.
+            # chip_build_tests=true pulls the whole src/ tree (incl. all cluster
+            # code the unit tests exercise) into the graph, so the build generates
+            # the zap-generated headers those TUs need — without it the default
+            # build is too lean and ~all src/app/clusters TUs fail to parse
+            # (missing headers) -> no findings. We build (ninja) but never run the
+            # suite (no `ninja check`), and -k 0 || true tolerates pw_pystamp tests
+            # that execute during the build.
             - name: Generate compile DB (host build for generated headers)
               run: >-
                   ./scripts/run_in_build_env.sh "
-                  BUILD_TYPE=host scripts/build/gn_gen.sh --args='is_clang=true' --add-export-compile-commands=* &&
+                  BUILD_TYPE=host scripts/build/gn_gen.sh --args='is_clang=true chip_build_tests=true' --add-export-compile-commands=* &&
                   (ninja -k 0 -C out/host || true)"
 
             # Whole-tree scan with the patched binary (prepended to PATH inside the

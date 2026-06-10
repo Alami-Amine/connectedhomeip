@@ -93,6 +93,11 @@ def main():
         # The bracket can carry the WarningsAsErrors suffix (e.g.
         # "[bugprone-foo,-warnings-as-errors]"); the primary check is first.
         check = m["checks"].split(",")[0].strip()
+        # Skip compiler diagnostics (clang-diagnostic-*): these are build errors
+        # (e.g. a TU that failed to parse due to a missing generated header), not
+        # clang-tidy lint findings — they would be noise in Code Scanning.
+        if check.startswith("clang-diagnostic"):
+            continue
         msg = m["msg"].strip()
         level = "error" if m["level"] == "error" else "warning"
 
