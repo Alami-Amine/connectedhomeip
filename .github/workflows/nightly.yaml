@@ -539,14 +539,26 @@ jobs:
 
             # Whole-tree scan with the patched binary (prepended to PATH inside the
             # build env so the wrapper's `clang-tidy` resolves to it). Advisory:
-            # `|| true` — findings never fail the job. WarningsAsErrors in the repo
-            # .clang-tidy makes the wrapper exit non-zero, but diagnostics are
-            # still logged, which is all the SARIF converter needs.
+            # `|| true` — findings never fail the job.
+            #
+            # ci-apply-runner-overrides.py patches the (ephemeral) checkout of the
+            # shared runner, which exposes no flag for these (see matter-clang-tidy
+            # runbook): -Wno-error (compile commands carry -Werror; warnings our
+            # from-source clang-tidy emits would abort ~200 TUs before the check
+            # runs), --header-filter=src/ (frontend checks hide header-located
+            # findings; much Optional code is header-inline), and
+            # --warnings-as-errors=-* (so a TU that merely HAS a finding is not
+            # miscounted as a failure).
+            #
+            # CodegenIntegration excluded: those TUs hard-include a specific app's
+            # generated app/static-cluster-config/*.h that a single host build cannot
+            # produce for every cluster (benign "file not found", not a real finding).
             - name: Run clang-tidy (whole tree, advisory)
               env:
                   TIDY_BIN_DIR: ${{ github.workspace }}/.cache/chip-optional-clang-tidy/bin
               run: |
-                  ./scripts/run_in_build_env.sh 'export PATH="'"$TIDY_BIN_DIR"':$PATH"; echo "using clang-tidy: $(command -v clang-tidy)"; ./scripts/run-clang-tidy-on-compile-commands.py --compile-database out/host/compile_commands.json --file-include-regex "(src|examples)/" --file-exclude-regex "/(repo|zzz_generated|lwip)/|-ReadImpl|-InvokeSubscribeImpl|CodegenDataModel_Write|QuieterReporting|/tests/" check' 2>&1 | tee clang-tidy.log || true
+                  python3 scripts/tools/clang-tidy/ci-apply-runner-overrides.py
+                  ./scripts/run_in_build_env.sh 'export PATH="'"$TIDY_BIN_DIR"':$PATH"; echo "using clang-tidy: $(command -v clang-tidy)"; ./scripts/run-clang-tidy-on-compile-commands.py --compile-database out/host/compile_commands.json --file-include-regex "(src|examples)/" --file-exclude-regex "/(repo|zzz_generated|lwip)/|-ReadImpl|-InvokeSubscribeImpl|CodegenDataModel_Write|QuieterReporting|/tests/|CodegenIntegration" check' 2>&1 | tee clang-tidy.log || true
 
             - name: Convert clang-tidy log to SARIF
               run: python3 scripts/tools/clang-tidy/clang_tidy_to_sarif.py clang-tidy.log --repo-root . > clang-tidy.sarif
