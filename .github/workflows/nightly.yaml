@@ -498,8 +498,8 @@ jobs:
               id: tidy-cache
               uses: actions/cache/restore@v4 # TODO: pin to a commit SHA per repo policy
               with:
-                  path: .cache/chip-optional-clang-tidy/clang-tidy
-                  key: chip-optional-clang-tidy-chip-build-194-${{ hashFiles('scripts/tools/clang-tidy/chip-optional-model.patch') }}
+                  path: .cache/chip-optional-clang-tidy
+                  key: chip-optional-clang-tidy-chip-build-194-${{ hashFiles('scripts/tools/clang-tidy/chip-optional-model.patch', 'scripts/tools/clang-tidy/build-clang-tidy.sh') }}
 
             - name: Build patched clang-tidy (no-op on cache hit)
               run: ./scripts/run_in_build_env.sh "./scripts/tools/clang-tidy/build-clang-tidy.sh"
@@ -512,8 +512,8 @@ jobs:
               if: steps.tidy-cache.outputs.cache-hit != 'true'
               uses: actions/cache/save@v4 # TODO: pin to a commit SHA per repo policy
               with:
-                  path: .cache/chip-optional-clang-tidy/clang-tidy
-                  key: chip-optional-clang-tidy-chip-build-194-${{ hashFiles('scripts/tools/clang-tidy/chip-optional-model.patch') }}
+                  path: .cache/chip-optional-clang-tidy
+                  key: chip-optional-clang-tidy-chip-build-194-${{ hashFiles('scripts/tools/clang-tidy/chip-optional-model.patch', 'scripts/tools/clang-tidy/build-clang-tidy.sh') }}
 
             # Plain host config (NO sanitizers — clang-tidy ignores -fsanitize).
             # gn_gen writes the compile DB; `ninja -k 0 ... || true` then builds so the
@@ -544,7 +544,7 @@ jobs:
             # still logged, which is all the SARIF converter needs.
             - name: Run clang-tidy (whole tree, advisory)
               env:
-                  TIDY_BIN_DIR: ${{ github.workspace }}/.cache/chip-optional-clang-tidy
+                  TIDY_BIN_DIR: ${{ github.workspace }}/.cache/chip-optional-clang-tidy/bin
               run: |
                   ./scripts/run_in_build_env.sh 'export PATH="'"$TIDY_BIN_DIR"':$PATH"; echo "using clang-tidy: $(command -v clang-tidy)"; ./scripts/run-clang-tidy-on-compile-commands.py --compile-database out/host/compile_commands.json --file-include-regex "(src|examples)/" --file-exclude-regex "/(repo|zzz_generated|lwip)/|-ReadImpl|-InvokeSubscribeImpl|CodegenDataModel_Write|QuieterReporting|/tests/" check' 2>&1 | tee clang-tidy.log || true
 

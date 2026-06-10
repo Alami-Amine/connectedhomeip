@@ -36,16 +36,18 @@ PATCH="$HERE/chip-optional-model.patch"
 # Output + work locations. Default under the workspace so CI `actions/cache` can
 # persist OUT_BIN keyed on the patch hash + toolchain image.
 OUT_DIR="${CHIP_OPTIONAL_CLANG_TIDY_DIR:-$PWD/.cache/chip-optional-clang-tidy}"
-OUT_BIN="$OUT_DIR/clang-tidy"
+# bin/ + lib/clang/ layout: clang-tidy finds its compiler builtin headers
+# (stddef.h, stdbool.h, ...) at <binary dir>/../lib/clang/<ver>/include.
+OUT_BIN="$OUT_DIR/bin/clang-tidy"
 SRC_DIR="$OUT_DIR/llvm-project"
 BUILD_DIR="$OUT_DIR/build"
 
-mkdir -p "$OUT_DIR"
+mkdir -p "$OUT_DIR/bin"
 
 log() { echo ">>> $*" >&2; }
 
-# Fast path: cache hit.
-if [[ -x "$OUT_BIN" ]]; then
+# Fast path: cache hit (binary AND its resource headers present).
+if [[ -x "$OUT_BIN" && -d "$OUT_DIR/lib/clang" ]]; then
     log "patched clang-tidy already present, skipping build"
     "$OUT_BIN" --version | sed -n '1,2p' >&2
     echo "$OUT_BIN"
@@ -103,10 +105,18 @@ cmake -G Ninja -S "$SRC_DIR/llvm" -B "$BUILD_DIR" \
     -DLLVM_INCLUDE_EXAMPLES=OFF \
     -DLLVM_INCLUDE_BENCHMARKS=OFF \
     -DCLANG_INCLUDE_TESTS=OFF
-ninja -C "$BUILD_DIR" clang-tidy
+# Build clang-tidy AND the compiler builtin headers (clang-resource-headers:
+# stddef.h, stdbool.h, stdint.h, intrinsics, ...). Without shipping these next to
+# the binary, every TU fails to parse with "'stddef.h' file not found".
+ninja -C "$BUILD_DIR" clang-tidy clang-resource-headers
 
 cp "$BUILD_DIR/bin/clang-tidy" "$OUT_BIN"
-log "built: $OUT_BIN"
+# Ship the resource dir so clang-tidy finds its builtin headers via
+# <bin>/../lib/clang/<ver>/include.
+rm -rf "$OUT_DIR/lib"
+mkdir -p "$OUT_DIR/lib"
+cp -a "$BUILD_DIR/lib/clang" "$OUT_DIR/lib/clang"
+log "built: $OUT_BIN (+ resource headers in $OUT_DIR/lib/clang)"
 "$OUT_BIN" --version | sed -n '1,2p' >&2
 
 # Last stdout line = the binary path (callers capture this).
