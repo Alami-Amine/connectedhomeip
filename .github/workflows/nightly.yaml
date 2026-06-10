@@ -515,19 +515,19 @@ jobs:
                   path: .cache/chip-optional-clang-tidy/clang-tidy
                   key: chip-optional-clang-tidy-chip-build-194-${{ hashFiles('scripts/tools/clang-tidy/chip-optional-model.patch') }}
 
-            # Plain host config (NO sanitizers — clang-tidy ignores -fsanitize) +
-            # a FULL ninja so every zap-generated header exists and every TU
-            # parses; a codegen-only build would silently skip TUs (coverage gaps).
-            # `ninja -k 0 ... || true`: a full build of a test-enabled config also
-            # *runs* the pigweed python tests (pw_pystamp), which can fail on
-            # env-specific assertions (e.g. scripts/build/test.py golden-file
-            # mismatch under ccache). We only need the C++ generated headers, so we
-            # keep building past such failures and tolerate the non-zero exit.
-            - name: Generate compile DB (full host build)
+            # Plain host config (NO sanitizers — clang-tidy ignores -fsanitize).
+            # gn_gen writes the compile DB; `ninja -k 0 ... || true` then builds so the
+            # zap-generated headers exist on disk (a TU only parses when its generated
+            # headers are present). We deliberately do NOT run scripts/tests/gn_tests.sh:
+            # it runs `ninja check`, i.e. it EXECUTES the unit + pigweed python tests
+            # (pw_pystamp), some of which fail on env-specific assertions (e.g.
+            # scripts/build/test.py golden-file mismatch under ccache) and abort this
+            # step. We only need the headers, not test results; `-k 0 || true` also
+            # tolerates any stray test-stamp targets that execute during the build.
+            - name: Generate compile DB (host build for generated headers)
               run: >-
                   ./scripts/run_in_build_env.sh "
                   BUILD_TYPE=host scripts/build/gn_gen.sh --args='is_clang=true' --add-export-compile-commands=* &&
-                  BUILD_TYPE=host scripts/tests/gn_tests.sh &&
                   (ninja -k 0 -C out/host || true)"
 
             # Whole-tree scan with the patched binary (prepended to PATH inside the
