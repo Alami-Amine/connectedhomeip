@@ -18,6 +18,7 @@
 #include "ThermostatCluster.h"
 
 #include <app/GlobalAttributes.h>
+#include <lib/support/CodeUtils.h>
 #include <platform/internal/CHIPDeviceLayerInternal.h>
 
 using namespace chip;
@@ -153,7 +154,7 @@ Status BuildAttributeStatuses(const EndpointId endpoint, const DataModel::Decoda
         // List can't be empty
         return Status::InvalidCommand;
     }
-    attributeStatuses.Alloc(attributeStatusCount);
+    VerifyOrReturnError(attributeStatuses.Alloc(attributeStatusCount), Status::ResourceExhausted);
     for (size_t i = 0; i < attributeStatusCount; ++i)
     {
         attributeStatuses[i].attributeID = kInvalidAttributeId;

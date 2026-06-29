@@ -126,6 +126,9 @@ CHIP_ERROR OTAImageHeaderParser::DecodeFixed()
     VerifyOrReturnError(fileIdentifier == kOTAImageFileIdentifier, CHIP_ERROR_INVALID_FILE_IDENTIFIER);
     // Safety check against malicious headers.
     VerifyOrReturnError(mHeaderTlvSize <= kMaxHeaderSize, CHIP_ERROR_NO_MEMORY);
+    // The declared total file size must at least cover the fixed header plus the TLV header it announces.
+    // A smaller value is internally inconsistent and indicates a malformed/malicious image.
+    VerifyOrReturnError(totalSize >= static_cast<uint64_t>(kFixedHeaderSize) + mHeaderTlvSize, CHIP_ERROR_INVALID_ARGUMENT);
     VerifyOrReturnError(mBuffer.Alloc(mHeaderTlvSize), CHIP_ERROR_NO_MEMORY);
 
     mState        = State::kTlv;

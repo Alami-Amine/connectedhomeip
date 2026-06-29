@@ -206,11 +206,22 @@ void OTAImageProcessorImpl::HandleProcessBlock(intptr_t context)
 
     if (!imageProcessor->readHeader) // First block received, process header
     {
+        // Guard against an undersized first block: the fixed-size copy below must not read past the
+        // received BDX payload. A malicious provider could otherwise send a short block.
+        if (block.size() < sizeof(ota_data_struct_t))
+        {
+            ChipLogError(SoftwareUpdate, "%s [%d] first OTA block too small for header", __FUNCTION__, __LINE__);
+            imageProcessor->mDownloader->EndDownload(CHIP_ERROR_INVALID_ARGUMENT);
+            return;
+        }
+
         ota_data_struct_t * tempBuf = (ota_data_struct_t *) chip::Platform::MemoryAlloc(sizeof(ota_data_struct_t));
 
         if (NULL == tempBuf)
         {
             ChipLogError(SoftwareUpdate, "%s [%d] malloc failed  ", __FUNCTION__, __LINE__);
+            imageProcessor->mDownloader->EndDownload(CHIP_ERROR_NO_MEMORY);
+            return;
         }
         memset((char *) tempBuf, 0, sizeof(ota_data_struct_t));
         memcpy((char *) &(imageProcessor->pOtaTgtHdr), block.data(), sizeof(ota_data_struct_t));
