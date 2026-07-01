@@ -123,7 +123,9 @@ bool ResourceData::Parse(const BytesRange & validData, const uint8_t ** start)
 
     uint16_t dataLen = chip::Encoding::BigEndian::Read16(nameEnd); // resource data
 
-    if (!validData.Contains(nameEnd + dataLen - 1))
+    // A zero-length RDATA is trivially in range; avoid forming a pointer before nameEnd when
+    // checking the last byte of a non-empty RDATA span.
+    if (dataLen > 0 && !validData.Contains(nameEnd + dataLen - 1))
     {
         return false; // no space for RDATA
     }
