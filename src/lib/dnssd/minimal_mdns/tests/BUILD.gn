@@ -44,33 +44,23 @@ chip_test_suite("tests") {
   ]
 }
 
-if (enable_fuzz_test_targets) {
-  chip_fuzz_target("fuzz-minmdns-packet-parsing") {
-    sources = [ "FuzzPacketParsing.cpp" ]
-    public_deps = [
-      "${chip_root}/src/lib/dnssd/minimal_mdns",
-      "${chip_root}/src/platform/logging:default",
-    ]
-  }
-  chip_fuzz_target("fuzz-minmdns-record-data") {
-    sources = [ "FuzzMdnsRecordData.cpp" ]
-    public_deps = [
-      "${chip_root}/src/lib/dnssd/minimal_mdns",
-      "${chip_root}/src/platform/logging:default",
-    ]
-  }
-  chip_fuzz_target("fuzz-minmdns-qname") {
-    sources = [ "FuzzMdnsQName.cpp" ]
-    public_deps = [
-      "${chip_root}/src/lib/dnssd/minimal_mdns",
-      "${chip_root}/src/platform/logging:default",
-    ]
-  }
-}
-
 if (pw_enable_fuzz_test_targets) {
   chip_pw_fuzz_target("fuzz-minmdns-packet-parsing-pw") {
     test_source = [ "FuzzPacketParsingPW.cpp" ]
+    public_deps = [
+      "${chip_root}/src/lib/dnssd/minimal_mdns",
+      "${chip_root}/src/platform/logging:default",
+    ]
+  }
+  chip_pw_fuzz_target("fuzz-minmdns-qname-pw") {
+    test_source = [ "FuzzMdnsQNamePW.cpp" ]
+    public_deps = [
+      "${chip_root}/src/lib/dnssd/minimal_mdns",
+      "${chip_root}/src/platform/logging:default",
+    ]
+  }
+  chip_pw_fuzz_target("fuzz-minmdns-record-data-pw") {
+    test_source = [ "FuzzMdnsRecordDataPW.cpp" ]
     public_deps = [
       "${chip_root}/src/lib/dnssd/minimal_mdns",
       "${chip_root}/src/platform/logging:default",

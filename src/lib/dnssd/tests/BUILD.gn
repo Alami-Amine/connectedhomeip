@@ -44,11 +44,22 @@ chip_test_suite("tests") {
   cflags = [ "-Wconversion" ]
 }
 
-if (enable_fuzz_test_targets) {
-  chip_fuzz_target("fuzz-dnssd-txt-fields") {
-    sources = [ "FuzzTxtFields.cpp" ]
+if (pw_enable_fuzz_test_targets) {
+  chip_pw_fuzz_target("fuzz-dnssd-txt-fields-pw") {
+    test_source = [ "FuzzTxtFieldsPW.cpp" ]
     public_deps = [
       "${chip_root}/src/lib/dnssd",
+      "${chip_root}/src/platform/logging:default",
+    ]
+  }
+
+  chip_pw_fuzz_target("fuzz-mdns-resolver-pw") {
+    test_source = [ "FuzzMdnsResolverPW.cpp" ]
+    public_deps = [
+      "${chip_root}/src/lib/dnssd",
+      "${chip_root}/src/lib/dnssd/minimal_mdns",
+      "${chip_root}/src/lib/dnssd/minimal_mdns/core",
+      "${chip_root}/src/lib/dnssd/minimal_mdns/records",
       "${chip_root}/src/platform/logging:default",
     ]
   }
