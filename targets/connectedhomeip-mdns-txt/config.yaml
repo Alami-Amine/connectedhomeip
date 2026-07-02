@@ -1,0 +1,32 @@
+# Copyright 2026 Anthropic PBC
+# SPDX-License-Identifier: Apache-2.0
+#
+# Sibling target: TXT-fields surface. Requires the connectedhomeip-mdns image
+# (vuln-pipeline-chip-mdns:latest) to be built first.
+image_tag: vuln-pipeline-chip-mdns-txt:latest
+github_url: https://github.com/Alami-Amine/connectedhomeip
+commit: d27ba35548f6c18f55c37d6393ade53dd18d0b20
+binary_path: /work/entry
+source_root: /work/connectedhomeip
+
+build_command: >-
+  cd /work/connectedhomeip &&
+  bash -c "source scripts/activate.sh &&
+  ninja -C out/fuzz src/lib/dnssd/tests:vp-fuzz-dnssd-txt-fields"
+
+attack_surface: |
+  FillNodeDataFromTxt — the DNS-SD TXT key/value parser that populates
+  CommonResolutionData / CommissionNodeData during Matter operational and
+  commissionable-node discovery. Reachable from any mDNS responder on the
+  local link; every byte is attacker-controlled. Crash sinks: the numeric
+  parsers (strtoul + range clamps for SII/SAI/SAT/D/CM/DT), the rotating-
+  device-id hex decode (RI -> HexToBytes into a fixed kMaxRotatingIdLen
+  buffer; a length-bound OOB-write canary), and the fixed-size deviceName[33]
+  / pairingInstruction[129] copies. Input framing: [keylen:1][key][value].
+
+focus_areas:
+  - "Rotating-device-id (RI) hex decode — HexToBytes length vs. fixed rotatingId[] buffer bound"
+  - "Numeric field parsers (SII/SAI/SAT/D/CM/DT) — overflow, leading zeros, oversize decimal strings into range clamps"
+  - "Fixed-buffer string copies (DN deviceName, PI pairingInstruction) — oversize values, embedded NUL, NUL-termination bounds"
+
+known_bugs: []

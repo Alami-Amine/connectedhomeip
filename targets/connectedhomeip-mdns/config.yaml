@@ -1,0 +1,46 @@
+# Copyright 2026 Anthropic PBC
+# SPDX-License-Identifier: Apache-2.0
+image_tag: vuln-pipeline-chip-mdns:latest
+github_url: https://github.com/Alami-Amine/connectedhomeip
+commit: d27ba35548f6c18f55c37d6393ade53dd18d0b20
+binary_path: /work/entry
+source_root: /work/connectedhomeip
+
+# Rebuild after a patch (patch grader T0). Re-sources the in-tree env so the
+# cipd clang/gn/ninja are on PATH, then rebuilds just the primary harness.
+build_command: >-
+  cd /work/connectedhomeip &&
+  bash -c "source scripts/activate.sh &&
+  ninja -C out/fuzz src/lib/dnssd/minimal_mdns/tests:vp-fuzz-minmdns-parsers"
+
+attack_surface: |
+  Matter (connectedhomeip) minimal mDNS wire parsers — the DNS-SD discovery
+  path. Every byte is attacker-controlled: any host on the local link can send
+  mDNS replies that a commissioning or operational Matter node parses without
+  authentication, before any PASE/CASE session exists. This is one of the
+  earliest-reachable untrusted-input surfaces on a Matter device.
+
+  The primary binary (/work/entry == vp-fuzz-minmdns-parsers) takes one raw
+  mDNS packet as its input file and fans it through:
+    - ParsePacket (mdns::Minimal) — header/query/resource-record walk, which
+      dispatches SRV / A / AAAA / PTR record parsing against the live packet
+      bounds;
+    - SerializedQNameIterator — the DNS name decoder, swept from every start
+      offset, exercising label-length and compression-pointer-target
+      validation (classic OOB-read / infinite-loop bug class);
+    - ParseTxtRecord — TXT record body key/value walk.
+
+  A second binary in the same image, out/fuzz/tests/vp-fuzz-dnssd-txt-fields,
+  targets FillNodeDataFromTxt (the TXT key/value semantic parser: numeric
+  range clamps, rotating-device-id hex decode into a fixed buffer, and the
+  fixed-size deviceName / pairingInstruction copies). Input framing is
+  [keylen:1][key][value]. Point binary_path at it (or use the sibling
+  connectedhomeip-mdns-txt target) to fuzz that surface.
+
+# Round-robin focus for parallel find-agents over the primary binary.
+focus_areas:
+  - "Packet structure (ParsePacket) — resource-record count vs. actual records, truncated headers, record rdata length overruns past the packet"
+  - "DNS name decoding (SerializedQNameIterator) — compression-pointer loops, forward/self pointers, look-behind bounds, label length 0x40/0x80 reserved bits"
+  - "Record bodies — SRV target name running off the packet, A/AAAA wrong-length records, PTR compression pointers, TXT length-prefix overruns"
+
+known_bugs: []

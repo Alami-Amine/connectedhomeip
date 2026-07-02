@@ -1,0 +1,37 @@
+# Copyright 2026 Anthropic PBC
+# SPDX-License-Identifier: Apache-2.0
+#
+# Sibling target: IncrementalResolver lifecycle. Requires the
+# connectedhomeip-mdns image (vuln-pipeline-chip-mdns:latest) to be built first.
+image_tag: vuln-pipeline-chip-mdns-resolver:latest
+github_url: https://github.com/Alami-Amine/connectedhomeip
+commit: d27ba35548f6c18f55c37d6393ade53dd18d0b20
+binary_path: /work/entry
+source_root: /work/connectedhomeip
+
+build_command: >-
+  cd /work/connectedhomeip &&
+  bash -c "source scripts/activate.sh &&
+  ninja -C out/fuzz src/lib/dnssd/tests:vp-fuzz-mdns-resolver"
+
+attack_surface: |
+  The DNS-SD IncrementalResolver orchestration layer — the code that drives a
+  full mDNS discovery record set (SRV -> TXT -> A/AAAA) into the fixed-size
+  Matter NodeData buffers (deviceName[33], pairingInstruction[129],
+  rotatingId[50], instanceName[], hostName[]). These fill sinks are only
+  reachable through the resolver lifecycle, not the isolated parsers; every
+  byte fed here is attacker-controlled (any mDNS responder on the local link).
+
+  A single flat input is split by a deterministic byte consumer into the
+  lifecycle's arguments (service flavor, SRV instance/host labels, port, TTL,
+  a vector of TXT key=value entries, and an A/AAAA address), then typed
+  ResourceRecords are built, serialized to wire bytes, re-parsed, and driven
+  through InitializeParsing -> OnRecord(TXT) -> OnRecord(IP) -> Take() — the
+  same wire decode the network receive path uses.
+
+focus_areas:
+  - "SRV instance/host label storage — instance names over kInstanceNameMaxLength, host over kHostNameMaxLength, oversize labels into StoredServerName"
+  - "TXT fill sinks through the resolver — deviceName/pairingInstruction/rotatingId copies driven by multi-pair TXT records"
+  - "Lifecycle state — non-Matter names, missing/duplicate records, TTL edge values, Take() before completion"
+
+known_bugs: []
