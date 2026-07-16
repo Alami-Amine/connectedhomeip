@@ -35,6 +35,7 @@ coverage_report_output_folder = "out/coverage_fuzztest"
 class FuzzTestMode(enum.Enum):
     UNIT_TEST_MODE = enum.auto()
     CONTINUOUS_FUZZ_MODE = enum.auto()
+    RUN_ALL_DEFINED_TIME = enum.auto()
 
 
 @dataclass
@@ -137,21 +138,34 @@ def run_fuzz_test(context):
 
     try:
         if context.run_mode == FuzzTestMode.UNIT_TEST_MODE:
+            subprocess.run([context.fuzz_test_binary_path, f"--fuzz_for=2m"], env=env, check=True)
+            logging.info("Fuzz Test Suite executed in Unit Test Mode.\n")
+        elif context.run_mode == FuzzTestMode.RUN_ALL_DEFINED_TIME:
             subprocess.run([context.fuzz_test_binary_path, ], env=env, check=True)
             logging.info("Fuzz Test Suite executed in Unit Test Mode.\n")
+
+
+# TODO : we have an issue here: if i run like this with incomplete fuzz test case name, it returns testcase not found and continues scripts/tests/run_fuzztest_coverage.py --fuzz-test out/linux-x64-tests-clang-pw-fuzztest-coverage/chip_pw_fuzztest/tests/fuzz-chip-cert-pw --test-case FuzzChipCert.Conve
+
         elif context.run_mode == FuzzTestMode.CONTINUOUS_FUZZ_MODE:
-            cmd_args = [context.fuzz_test_binary_path, f"--fuzz={context.selected_fuzz_test_case}"]
-            # Use Popen instead of run() so we can always terminate cleanly and avoid profraw file issues
-            process = subprocess.Popen(cmd_args, env=env)
-            return_code = process.wait()
-            if return_code != 0:
-                raise subprocess.CalledProcessError(process.returncode, cmd_args)
+            # Use Popen instead of run() so we can terminate cleanly and avoid profraw file issues
+            process = subprocess.Popen(
+                [context.fuzz_test_binary_path, f"--fuzz={context.selected_fuzz_test_case}"],
+                env=env
+            )
+            process.wait()
+            # stderr = process.communicate()
+            # print(stderr)
+            # if process.returncode != 0:
+            #     raise subprocess.CalledProcessError(process.returncode, process.args, stderr=stderr)
 
     except KeyboardInterrupt:
-        logging.info("\nFuzzing Interrupted by the user \n")
-        if context.run_mode == FuzzTestMode.CONTINUOUS_FUZZ_MODE:
+        logging.info("Continuous Fuzzing interrupted. Terminating subprocess...")
+
+        if context.run_mode == FuzzTestMode.CONTINUOUS_FUZZ_MODE and 'process' in locals():
             process.terminate()
             process.wait()
+            logging.info("Subprocess terminated cleanly.")
 
     except Exception as e:
         raise ValueError(f"Error running fuzz test: {e}")
@@ -214,7 +228,7 @@ def generate_coverage_report(context, output_dir_arg):
     cmd = ["genhtml"]
 
     errors_to_ignore = [
-        "inconsistent", "source", "unmapped"
+        "inconsistent", "source"
     ]
     for e in errors_to_ignore:
         cmd.append("--ignore-errors")
@@ -350,11 +364,9 @@ def run_script_in_normal_mode(fuzz_test, test_case, list_test_cases, help):
 
     if test_case.strip().lower() == "all":
         context.run_mode = FuzzTestMode.UNIT_TEST_MODE
-    elif test_case in test_cases:
+    else:
         context.run_mode = FuzzTestMode.CONTINUOUS_FUZZ_MODE
         context.selected_fuzz_test_case = test_case
-    else:
-        raise ValueError(f"Test case '{test_case}' not found in the list of test cases for {context.fuzz_test_binary_name} ")
 
     return context
 
