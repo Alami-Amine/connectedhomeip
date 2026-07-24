@@ -1292,12 +1292,9 @@ jobs:
           contents: write
           checks: write
       env:
-          # The Allure history report is only ever published to gh-pages
-          # post-merge (see "Deploy to GitHub Pages"). On pull_request /
-          # merge_group the deploy is skipped, so generating the report -- and
-          # especially checking out the gh-pages history branch -- is wasted
-          # work. Gate the publish-only steps on this so PRs keep just the
-          # JUnit test annotations.
+          # Allure is only deployed to gh-pages post-merge; on PRs / merge_group
+          # the deploy no-ops, so building it (and cloning the gh-pages history)
+          # is wasted work. Gate the publish-only steps below on this.
           PUBLISH_ALLURE_HISTORY: ${{ github.event_name != 'pull_request' && github.event_name != 'merge_group' }}
 
       steps:
