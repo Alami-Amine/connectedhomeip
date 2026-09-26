@@ -16,17 +16,8 @@
 
 """Import generated FuzzTest and Abseil BUILD.gn files into this directory.
 
-To move to new FuzzTest / Abseil releases:
-  1. Set the versions in bazel_to_gn/workspace/MODULE.bazel, and move the
-     third_party/fuzztest and third_party/abseil-cpp/src submodules to match.
-  2. Generate (needs bazelisk on PATH):
-       python3 bazel_to_gn/bazel_to_gn.py -r bazel_to_gn/workspace fuzztest
-  3. Import: python3 import_bazel_to_gn.py
-
-bazel_to_gn/ holds Pigweed's generator (pw_build/py/pw_build) with Bazel 8
-canonical-label support added. Only generated BUILD.gn files are imported;
-the top-level BUILD.gn of each library, the .gni templates and googletest/
-are maintained here. Labels are rewritten so nothing refers to Pigweed.
+Reads the output of bazel_to_gn/bazel_to_gn.py, rewrites its Pigweed-style
+labels and keeps the hand-maintained files. See README.md for the update steps.
 """
 
 import argparse

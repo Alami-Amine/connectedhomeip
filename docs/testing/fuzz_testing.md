@@ -380,10 +380,7 @@ $ ./fuzz-chip-cert-pw --fuzz=ChipCert.DecodeChipCertFuzzer
     in `third_party/fuzztest-gn/`.
 -   The GN files list source files explicitly, so they only work with the
     FuzzTest and Abseil revisions they were generated for. To move to newer
-    revisions, follow the steps at the top of
-    `third_party/fuzztest-gn/import_bazel_to_gn.py`: set the versions in
-    `bazel_to_gn/workspace/MODULE.bazel`, bump both submodules to match, run
-    `bazel_to_gn.py`, then `import_bazel_to_gn.py`.
+    revisions, follow `third_party/fuzztest-gn/README.md`.
 
 #### TO ADD:
 
