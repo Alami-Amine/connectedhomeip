@@ -12,6 +12,9 @@
 # License for the specific language governing permissions and limitations under
 # the License.
 
+# Maintained in connectedhomeip; not produced by bazel_to_gn.py, and kept by
+# import_bazel_to_gn.py.
+
 import("//third_party/fuzztest-gn/fuzztest/fuzztest.gni")
 
 config("fuzztest_public_config") {

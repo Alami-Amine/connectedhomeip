@@ -16,12 +16,17 @@
 
 """Import generated FuzzTest and Abseil BUILD.gn files into this directory.
 
-The source is any tree laid out like Pigweed's `third_party/{fuzztest,abseil-cpp}`:
-a Pigweed checkout from before its GN FuzzTest support was removed (c14c119c5),
-or the output of Pigweed's `pw_build/py/pw_build/bazel_to_gn.py` run against
-newer FuzzTest and Abseil releases. Only BUILD.gn files are imported; the
-templates in fuzztest.gni and abseil-cpp.gni and the googletest build are
-maintained here. Labels are rewritten so nothing refers to Pigweed.
+To move to new FuzzTest / Abseil releases:
+  1. Set the versions in bazel_to_gn/workspace/MODULE.bazel, and move the
+     third_party/fuzztest and third_party/abseil-cpp/src submodules to match.
+  2. Generate (needs bazelisk on PATH):
+       python3 bazel_to_gn/bazel_to_gn.py -r bazel_to_gn/workspace fuzztest
+  3. Import: python3 import_bazel_to_gn.py
+
+bazel_to_gn/ holds Pigweed's generator (pw_build/py/pw_build) with Bazel 8
+canonical-label support added. Only generated BUILD.gn files are imported;
+the top-level BUILD.gn of each library, the .gni templates and googletest/
+are maintained here. Labels are rewritten so nothing refers to Pigweed.
 """
 
 import argparse
@@ -52,8 +57,11 @@ def import_build_files(source_root: pathlib.Path) -> list[pathlib.Path]:
         if not src_dir.is_dir():
             sys.exit(f"{src_dir} not found")
         for stale in dst_dir.rglob("BUILD.gn"):
-            stale.unlink()
+            if stale.parent != dst_dir:
+                stale.unlink()
         for src in sorted(src_dir.rglob("BUILD.gn")):
+            if src.parent == src_dir:
+                continue
             text = src.read_text()
             for pattern, replacement in SUBSTITUTIONS:
                 text = pattern.sub(replacement, text)
@@ -68,10 +76,10 @@ def import_build_files(source_root: pathlib.Path) -> list[pathlib.Path]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--pigweed", type=pathlib.Path, default=HERE.parent / "pigweed" / "repo",
-                        help="root of a Pigweed-layout tree (default: the pigweed submodule)")
+    parser.add_argument("--source", type=pathlib.Path, default=HERE / "bazel_to_gn" / "workspace",
+                        help="bazel_to_gn.py root holding third_party/{fuzztest,abseil-cpp} (default: %(default)s)")
     args = parser.parse_args()
-    written = import_build_files(args.pigweed.resolve())
+    written = import_build_files(args.source.resolve())
     subprocess.run(["gn", "format", *map(str, written)], check=True, stdout=subprocess.DEVNULL)
     print(f"wrote {len(written)} files under {HERE}")
 

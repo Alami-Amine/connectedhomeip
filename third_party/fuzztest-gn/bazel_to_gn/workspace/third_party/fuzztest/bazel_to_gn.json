@@ -1,0 +1,10 @@
+{
+  "generate": true,
+  "targets": [
+    "@fuzztest//fuzztest:fuzztest_core",
+    "@fuzztest//fuzztest:fuzztest_gtest_main"
+  ],
+  "options": {
+    "@fuzztest//fuzztest:use_riegeli": false
+  }
+}

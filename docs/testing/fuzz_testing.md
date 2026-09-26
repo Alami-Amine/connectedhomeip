@@ -375,13 +375,15 @@ $ ./fuzz-chip-cert-pw --fuzz=ChipCert.DecodeChipCertFuzzer
     (`third_party/fuzztest` and `third_party/abseil-cpp/src`).
 -   Since FuzzTest and Abseil only support the `bazel` and `CMake` build systems
     and do not support GN, their GN files are generated from the Bazel build by
-    Pigweed's `bazel_to_gn.py`. Pigweed no longer ships these GN files, so
-    Matter keeps them in `third_party/fuzztest-gn/`.
+    `bazel_to_gn.py` (taken from Pigweed, which no longer ships these GN files).
+    The generator, a minimal Bazel workspace and the generated files all live
+    in `third_party/fuzztest-gn/`.
 -   The GN files list source files explicitly, so they only work with the
     FuzzTest and Abseil revisions they were generated for. To move to newer
-    revisions, bump both submodules together, regenerate the GN files with
-    `bazel_to_gn.py`, and import them with
-    `third_party/fuzztest-gn/import_bazel_to_gn.py --pigweed <output tree>`.
+    revisions, follow the steps at the top of
+    `third_party/fuzztest-gn/import_bazel_to_gn.py`: set the versions in
+    `bazel_to_gn/workspace/MODULE.bazel`, bump both submodules to match, run
+    `bazel_to_gn.py`, then `import_bazel_to_gn.py`.
 
 #### TO ADD:
 

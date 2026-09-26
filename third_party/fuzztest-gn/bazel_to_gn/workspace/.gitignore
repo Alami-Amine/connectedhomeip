@@ -1,0 +1,4 @@
+# Output of bazel_to_gn.py; import_bazel_to_gn.py copies it into ../../
+/third_party/*/**/BUILD.gn
+/bazel-*
+/MODULE.bazel.lock
