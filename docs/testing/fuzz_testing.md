@@ -122,7 +122,7 @@ for an example of a simple fuzz test.
 ## `Google's FuzzTest`
 
 -   Google FuzzTest is built by Matter's own GN build in
-    `third_party/fuzztest-gn/`, independent of Pigweed. Fuzz targets include
+    `third_party/fuzztest/`, independent of Pigweed. Fuzz targets include
     `<fuzztest/fuzztest_core.h>` and `<gtest/gtest.h>`.
 
 ### Use cases
@@ -372,15 +372,15 @@ $ ./fuzz-chip-cert-pw --fuzz=ChipCert.DecodeChipCertFuzzer
 #### What revision should the FuzzTest and Abseil submodules be for running `pw_fuzzer` with FuzzTest?
 
 -   Matter integrates Google FuzzTest and Abseil as submodules
-    (`third_party/fuzztest` and `third_party/abseil-cpp/src`).
+    (`third_party/fuzztest/repo` and `third_party/abseil-cpp/src`).
 -   Since FuzzTest and Abseil only support the `bazel` and `CMake` build systems
     and do not support GN, their GN files are generated from the Bazel build by
     `bazel_to_gn.py` (taken from Pigweed, which no longer ships these GN files).
     The generator, a minimal Bazel workspace and the generated files all live
-    in `third_party/fuzztest-gn/`.
+    in `third_party/fuzztest/` and `third_party/abseil-cpp/`.
 -   The GN files list source files explicitly, so they only work with the
     FuzzTest and Abseil revisions they were generated for. To move to newer
-    revisions, follow `third_party/fuzztest-gn/README.md`.
+    revisions, follow `third_party/fuzztest/README.md`.
 
 #### TO ADD:
 

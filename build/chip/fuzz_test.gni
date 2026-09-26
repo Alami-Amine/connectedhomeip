@@ -123,7 +123,7 @@ template("chip_pw_fuzz_target") {
       if (!defined(deps)) {
         deps = []
       }
-      deps += [ "${chip_root}/third_party/fuzztest-gn:fuzztest" ]
+      deps += [ "${chip_root}/third_party/fuzztest" ]
     }
   } else {
     not_needed(invoker, "*")

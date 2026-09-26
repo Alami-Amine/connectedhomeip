@@ -99,7 +99,7 @@ config("fuzztest_lld") {
 }
 
 # Toolchain for FuzzTest binaries: chip's clang host toolchain with chip's own
-# sanitizer, fuzzing and coverage configs. //third_party/fuzztest-gn builds
+# sanitizer, fuzzing and coverage configs. //third_party/fuzztest builds
 # FuzzTest itself.
 gcc_toolchain("chip_pw_fuzztest") {
   # Under OSS-Fuzz, use the compiler OSS-Fuzz provides ($CC/$CXX) so the
@@ -115,7 +115,7 @@ gcc_toolchain("chip_pw_fuzztest") {
     current_cpu = host_cpu
     is_clang = true
 
-    chip_fuzztest_dir = "//third_party/fuzztest"
+    chip_fuzztest_dir = "//third_party/fuzztest/repo"
     chip_abseil_cpp_dir = "//third_party/abseil-cpp/src"
 
     # chip's test-support libraries use pw_unit_test; back it with the
@@ -123,7 +123,7 @@ gcc_toolchain("chip_pw_fuzztest") {
     pw_unit_test_BACKEND = "$dir_pw_unit_test:googletest"
     dir_pw_third_party_googletest = ""
     pw_third_party_googletest_ALIAS =
-        "//third_party/fuzztest-gn/googletest:googletest"
+        "//third_party/fuzztest/googletest:googletest"
     chip_build_tests_googletest = true
 
     # the third_party abseil-cpp triggers warnings related to
