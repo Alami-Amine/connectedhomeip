@@ -122,8 +122,7 @@ gcc_toolchain("chip_pw_fuzztest") {
     # GoogleTest that FuzzTest links so a binary holds a single copy.
     pw_unit_test_BACKEND = "$dir_pw_unit_test:googletest"
     dir_pw_third_party_googletest = ""
-    pw_third_party_googletest_ALIAS =
-        "//third_party/fuzztest/googletest:googletest"
+    pw_third_party_googletest_ALIAS = "//third_party/googletest:googletest"
     chip_build_tests_googletest = true
 
     # the third_party abseil-cpp triggers warnings related to

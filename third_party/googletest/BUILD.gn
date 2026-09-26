@@ -13,8 +13,8 @@
 # License for the specific language governing permissions and limitations under
 # the License.
 
-# GoogleTest for the FuzzTest toolchain, derived from Pigweed's
-# third_party/googletest/BUILD.gn. The toolchain also points
+# GoogleTest (sources in repo/) for the FuzzTest toolchain, derived from
+# Pigweed's third_party/googletest/BUILD.gn. The toolchain also points
 # pw_third_party_googletest_ALIAS here, so pw_unit_test users in the same
 # binary link this copy rather than a second one.
 

@@ -7,10 +7,10 @@ GN build for [Google FuzzTest](https://github.com/google/fuzztest) and [Abseil](
 | `repo/` | FuzzTest submodule |
 | `fuzztest/`, `common/` | Generated `BUILD.gn` files (do not edit) |
 | `BUILD.gn`, `fuzztest.gni` | Maintained by hand |
-| `googletest/` | GoogleTest for the FuzzTest toolchain |
 | `bazel_to_gn/` | The generator (from Pigweed's `pw_build`) and the Bazel workspace it queries |
 | `import_bazel_to_gn.py` | Copies the generated files into place and rewrites their labels |
 | `../abseil-cpp/` | Abseil: `src/` submodule, generated `absl/**/BUILD.gn`, hand-maintained `BUILD.gn` and `abseil-cpp.gni` |
+| `../googletest/` | GoogleTest: `repo/` submodule and a hand-maintained `BUILD.gn` |
 
 ## Updating FuzzTest and Abseil
 
@@ -31,4 +31,4 @@ Generated compiler flags other than `-Wno-*` are dropped on import, because Baze
 
 ## What still comes from Pigweed
 
-FuzzTest itself uses nothing from Pigweed. The fuzz binaries still link Pigweed through the rest of Matter: `pw_unit_test` (Matter's test helpers), `pw_log` and `pw_assert` (`src/pw_backends`), and `pw_string`. The toolchain points `pw_unit_test` at `googletest/`, so each binary links a single GoogleTest.
+FuzzTest itself uses nothing from Pigweed. The fuzz binaries still link Pigweed through the rest of Matter: `pw_unit_test` (Matter's test helpers), `pw_log` and `pw_assert` (`src/pw_backends`), and `pw_string`. The toolchain points `pw_unit_test` at `//third_party/googletest`, so each binary links a single GoogleTest.

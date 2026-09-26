@@ -187,7 +187,7 @@ fuzztest_source_set("fuzztest_gtest_main") {
   public_deps = [
     ":init_fuzztest",
     "//third_party/abseil-cpp/absl/strings",
-    "//third_party/fuzztest/googletest:gtest",
+    "//third_party/googletest:gtest",
   ]
 }
 
@@ -223,7 +223,7 @@ fuzztest_source_set("googletest_adaptor") {
     "//third_party/abseil-cpp/absl/strings",
     "//third_party/abseil-cpp/absl/strings:str_format",
     "//third_party/abseil-cpp/absl/strings:string_view",
-    "//third_party/fuzztest/googletest:gtest",
+    "//third_party/googletest:gtest",
   ]
 }
 
@@ -248,7 +248,7 @@ fuzztest_source_set("init_fuzztest") {
     "//third_party/abseil-cpp/absl/strings",
     "//third_party/abseil-cpp/absl/strings:str_format",
     "//third_party/abseil-cpp/absl/time",
-    "//third_party/fuzztest/googletest:gtest",
+    "//third_party/googletest:gtest",
   ]
 }
 
