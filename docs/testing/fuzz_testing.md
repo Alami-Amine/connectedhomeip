@@ -121,9 +121,9 @@ for an example of a simple fuzz test.
 
 ## `Google's FuzzTest`
 
--   Google FuzzTest is integrated through Pigweed
-    [pw_fuzzer](https://pigweed.dev/pw_fuzzer/concepts.html), with the GN
-    build for FuzzTest kept in `third_party/pw_fuzzer/`.
+-   Google FuzzTest is built by Matter's own GN build in
+    `third_party/fuzztest-gn/`, independent of Pigweed. Fuzz targets include
+    `<fuzztest/fuzztest_core.h>` and `<gtest/gtest.h>`.
 
 ### Use cases
 
@@ -376,12 +376,12 @@ $ ./fuzz-chip-cert-pw --fuzz=ChipCert.DecodeChipCertFuzzer
 -   Since FuzzTest and Abseil only support the `bazel` and `CMake` build systems
     and do not support GN, their GN files are generated from the Bazel build by
     Pigweed's `bazel_to_gn.py`. Pigweed no longer ships these GN files, so
-    Matter keeps them in `third_party/pw_fuzzer/`.
+    Matter keeps them in `third_party/fuzztest-gn/`.
 -   The GN files list source files explicitly, so they only work with the
     FuzzTest and Abseil revisions they were generated for. To move to newer
     revisions, bump both submodules together, regenerate the GN files with
     `bazel_to_gn.py`, and import them with
-    `third_party/pw_fuzzer/relabel_pigweed_gn.py --pigweed <output tree>`.
+    `third_party/fuzztest-gn/import_bazel_to_gn.py --pigweed <output tree>`.
 
 #### TO ADD:
 

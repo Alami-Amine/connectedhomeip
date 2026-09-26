@@ -36,8 +36,8 @@
 #include <lib/support/CHIPMem.h>
 #include <lib/support/Span.h>
 
-#include <pw_fuzzer/fuzztest.h>
-#include <pw_unit_test/framework.h>
+#include <fuzztest/fuzztest_core.h>
+#include <gtest/gtest.h>
 
 namespace {
 

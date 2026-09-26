@@ -1,0 +1,57 @@
+# Copyright 2021 The Pigweed Authors
+# Copyright (c) 2026 Project CHIP Authors
+#
+# Licensed under the Apache License, Version 2.0 (the "License"); you may not
+# use this file except in compliance with the License. You may obtain a copy of
+# the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+# WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+# License for the specific language governing permissions and limitations under
+# the License.
+
+# GoogleTest for the FuzzTest toolchain, derived from Pigweed's
+# third_party/googletest/BUILD.gn. The toolchain also points
+# pw_third_party_googletest_ALIAS here, so pw_unit_test users in the same
+# binary link this copy rather than a second one.
+
+import("//build_overrides/googletest.gni")
+
+config("includes") {
+  include_dirs = [
+    "$dir_googletest/googletest",
+    "$dir_googletest/googletest/include",
+    "$dir_googletest/googlemock",
+    "$dir_googletest/googlemock/include",
+  ]
+  cflags = [
+    "-Wno-undef",
+    "-Wno-conversion",
+    "-Wno-shadow-all",
+    "-Wno-switch-enum",
+  ]
+}
+
+source_set("googletest") {
+  public_configs = [ ":includes" ]
+  public = [
+    "$dir_googletest/googlemock/include/gmock/gmock-matchers.h",
+    "$dir_googletest/googlemock/include/gmock/gmock.h",
+    "$dir_googletest/googletest/include/gtest/gtest-spi.h",
+    "$dir_googletest/googletest/include/gtest/gtest.h",
+  ]
+
+  # The "*-all.cc" files include the rest of each library's sources.
+  sources = [
+    "$dir_googletest/googlemock/src/gmock-all.cc",
+    "$dir_googletest/googletest/src/gtest-all.cc",
+  ]
+}
+
+# Matches the Bazel label @com_google_googletest//:gtest used by FuzzTest.
+group("gtest") {
+  public_deps = [ ":googletest" ]
+}
