@@ -46,6 +46,17 @@ SUBSTITUTIONS = [
     (re.compile(r"\bdir_pw_third_party_abseil_cpp\b"), "chip_abseil_cpp_dir"),
 ]
 PIGWEED_REFERENCE = re.compile(r"\$dir_pw|\$pw_|dir_pw_third_party|pigweed\.gni")
+# Bazel resolves copts for the host that ran the generator (e.g. -maes on
+# x86_64), so only warning suppressions are kept; the configs here set the rest.
+GENERATED_CFLAGS = re.compile(r"(?ms)^  cflags = \[\n(.*?)^  \]\n|^  cflags = \[([^\n]*)\]\n")
+
+
+def keep_warning_suppressions(match: re.Match) -> str:
+    flags = [f for f in re.findall(r'"([^"]+)"', match.group(1) or match.group(2)) if f.startswith("-Wno-")]
+    if not flags:
+        return ""
+    quoted = ", ".join('"' + f + '"' for f in flags)
+    return "  cflags = [ " + quoted + " ]\n"
 
 
 def import_build_files(source_root: pathlib.Path) -> list[pathlib.Path]:
@@ -65,6 +76,7 @@ def import_build_files(source_root: pathlib.Path) -> list[pathlib.Path]:
             text = src.read_text()
             for pattern, replacement in SUBSTITUTIONS:
                 text = pattern.sub(replacement, text)
+            text = GENERATED_CFLAGS.sub(keep_warning_suppressions, text)
             if PIGWEED_REFERENCE.search(text):
                 sys.exit(f"{src}: unhandled Pigweed reference")
             dst = dst_dir / src.relative_to(src_dir)
