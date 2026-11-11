@@ -1014,3 +1014,56 @@ TEST_F(TestBdxTransferSession, TestRejectTransfer)
     // Reject the transfer with a status
     SendAndVerifyRejectMsg(outEvent, respondingSender, StatusCode::kResponderBusy, initiatingReceiver);
 }
+
+// When a TransferInit proposes more than one mutually supported control mode, ResolveTransferControlOptions() leaves
+// the choice to the application, which makes it through TransferAcceptData::ControlMode. AcceptTransfer() validated
+// that choice but never stored it, so mControlMode kept whatever value it already held -- unset on a fresh session --
+// and the drive-mode decisions that follow (notably arming the response timeout) were made on that value.
+// The initiator-side TransferInitData carries a single mode, so the multi-mode proposal is injected directly.
+TEST_F(TestBdxTransferSession, TestAcceptTransferAdoptsChosenControlMode)
+{
+    TransferSession::OutputEvent outEvent;
+    TransferSession respondingSender;
+
+    uint16_t maxBlockSize              = 64;
+    System::Clock::Timeout timeout     = System::Clock::Milliseconds32(24);
+    System::Clock::Timestamp startTime = System::Clock::Milliseconds64(100);
+    System::Clock::Timestamp endTime   = System::Clock::Milliseconds64(124);
+
+    BitFlags<TransferControlFlags> responderControl;
+    responderControl.Set(TransferControlFlags::kSenderDrive).Set(TransferControlFlags::kReceiverDrive);
+    EXPECT_EQ(respondingSender.WaitForTransfer(TransferRole::kSender, responderControl, maxBlockSize, timeout), CHIP_NO_ERROR);
+
+    char testFileDes[9] = { "test.txt" };
+    TransferInit initMsg;
+    initMsg.TransferCtlOptions.Set(TransferControlFlags::kSenderDrive).Set(TransferControlFlags::kReceiverDrive);
+    initMsg.Version        = 0;
+    initMsg.MaxBlockSize   = maxBlockSize;
+    initMsg.StartOffset    = 0;
+    initMsg.MaxLength      = 0;
+    initMsg.FileDesLength  = static_cast<uint16_t>(strlen(testFileDes));
+    initMsg.FileDesignator = reinterpret_cast<uint8_t *>(testFileDes);
+    initMsg.Metadata       = nullptr;
+    initMsg.MetadataLength = 0;
+
+    EXPECT_EQ(SendRawBdxMessage(initMsg, MessageType::ReceiveInit, respondingSender), CHIP_NO_ERROR);
+    respondingSender.PollOutput(outEvent, startTime);
+    ASSERT_EQ(outEvent.EventType, TransferSession::OutputEventType::kInitReceived);
+
+    TransferSession::TransferAcceptData acceptData;
+    acceptData.ControlMode    = TransferControlFlags::kReceiverDrive;
+    acceptData.MaxBlockSize   = maxBlockSize;
+    acceptData.StartOffset    = 0;
+    acceptData.Length         = 0;
+    acceptData.Metadata       = nullptr;
+    acceptData.MetadataLength = 0;
+    EXPECT_EQ(respondingSender.AcceptTransfer(acceptData), CHIP_NO_ERROR);
+    EXPECT_EQ(respondingSender.GetControlMode(), TransferControlFlags::kReceiverDrive);
+
+    // Under receiver drive the sender is waiting for a BlockQuery once the accept goes out, so the transfer
+    // timeout must be armed. It is only armed if the chosen control mode was recorded.
+    respondingSender.PollOutput(outEvent, startTime);
+    VerifyBdxMessageToSend(outEvent, MessageType::ReceiveAccept);
+    respondingSender.PollOutput(outEvent, endTime);
+    EXPECT_EQ(outEvent.EventType, TransferSession::OutputEventType::kTransferTimeout);
+}

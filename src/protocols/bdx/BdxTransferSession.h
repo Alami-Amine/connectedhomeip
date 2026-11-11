@@ -383,8 +383,9 @@ private:
     BitFlags<TransferControlFlags> mSuppportedXferOpts;
     uint16_t mMaxSupportedBlockSize = 0;
 
-    // Used to govern transfer once it has been accepted
-    TransferControlFlags mControlMode;
+    // Used to govern transfer once it has been accepted. There is no enumerator for "not yet negotiated", so this
+    // is value-initialized to a bit pattern that matches no control mode.
+    TransferControlFlags mControlMode{};
     uint8_t mTransferVersion       = 0;
     uint64_t mStartOffset          = 0; ///< 0 represents no offset
     uint64_t mTransferLength       = 0; ///< 0 represents indefinite length

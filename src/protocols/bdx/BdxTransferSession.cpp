@@ -206,11 +206,15 @@ CHIP_ERROR TransferSession::AcceptTransfer(const TransferAcceptData & acceptData
     VerifyOrReturnError(mState == TransferState::kNegotiateTransferParams, CHIP_ERROR_INCORRECT_STATE);
     VerifyOrReturnError(mPendingOutput == OutputEventType::kNone, CHIP_ERROR_INCORRECT_STATE);
 
-    // Don't allow a Control method that wasn't supported by the initiator
+    // Don't allow a Control method that wasn't supported by the initiator or by us
     // MaxBlockSize can't be larger than the proposed value
     VerifyOrReturnError(proposedControlOpts.Has(acceptData.ControlMode), CHIP_ERROR_INVALID_ARGUMENT);
+    VerifyOrReturnError(mSuppportedXferOpts.Has(acceptData.ControlMode), CHIP_ERROR_INVALID_ARGUMENT);
     VerifyOrReturnError(acceptData.MaxBlockSize <= mTransferRequestData.MaxBlockSize, CHIP_ERROR_INVALID_ARGUMENT);
 
+    // ResolveTransferControlOptions() only settles on a mode when exactly one is common to both peers; otherwise the
+    // choice is the application's, and this is where it is made.
+    mControlMode          = acceptData.ControlMode;
     mTransferMaxBlockSize = acceptData.MaxBlockSize;
 
     if (mRole == TransferRole::kSender)
@@ -414,6 +418,7 @@ void TransferSession::Reset()
     mPendingOutput = OutputEventType::kNone;
     mState         = TransferState::kUnitialized;
     mSuppportedXferOpts.ClearAll();
+    mControlMode           = TransferControlFlags{};
     mTransferVersion       = 0;
     mMaxSupportedBlockSize = 0;
     mStartOffset           = 0;
@@ -820,7 +825,8 @@ void TransferSession::ResolveTransferControlOptions(const BitFlags<TransferContr
     }
 
     // Ensure there are options supported by both nodes. Async gets priority.
-    // If there is only one common option, choose that one. Otherwise the application must pick.
+    // If there is only one common option, choose that one. Otherwise the application must pick one, which it does by
+    // way of TransferAcceptData::ControlMode in AcceptTransfer().
     const BitFlags<TransferControlFlags> commonOpts(proposed & mSuppportedXferOpts);
     if (!commonOpts.HasAny())
     {
